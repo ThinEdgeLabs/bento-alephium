@@ -3,9 +3,12 @@ use crate::types::{
     BlocksPerTimestampRange, Transaction,
 };
 use anyhow::Result;
+use std::env;
 use url::Url;
 
+#[derive(Clone, Debug)]
 pub enum Network {
+    Development,
     Testnet,
     Mainnet,
     Custom(String),
@@ -14,8 +17,12 @@ pub enum Network {
 impl Network {
     pub fn base_url(&self) -> String {
         match self {
-            Network::Testnet => "https://node.testnet.alephium.org".to_owned(),
-            Network::Mainnet => "https://node.mainnet.alephium.org".to_owned(),
+            Network::Development => env::var("DEV_NODE_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:12973".to_owned()),
+            Network::Testnet => env::var("TESTNET_NODE_URL")
+                .unwrap_or_else(|_| "https://node.testnet.alephium.org".to_owned()),
+            Network::Mainnet => env::var("MAINNET_NODE_URL")
+                .unwrap_or_else(|_| "https://node.mainnet.alephium.org".to_owned()),
             Network::Custom(url) => url.clone(),
         }
     }
@@ -23,7 +30,14 @@ impl Network {
 
 impl Default for Network {
     fn default() -> Self {
-        Self::Mainnet
+        env::var("ENVIRONMENT")
+            .map(|env| match env.as_str() {
+                "development" => Network::Development,
+                "testnet" => Network::Testnet,
+                "mainnet" => Network::Mainnet,
+                _ => Network::Mainnet,
+            })
+            .unwrap_or(Network::Mainnet)
     }
 }
 
@@ -35,7 +49,10 @@ pub struct Client {
 
 impl Client {
     pub fn new(network: Network) -> Self {
-        Self { inner: reqwest::Client::new(), base_url: network.base_url() }
+        Self { 
+            inner: reqwest::Client::new(), 
+            base_url: network.base_url() 
+        }
     }
 
     // List blocks on the given time interval.
@@ -95,7 +112,6 @@ impl Client {
     pub async fn get_transaction(&self, tx_id: &str) -> Result<Transaction> {
         let endpoint = format!("transactions/details/{}", tx_id);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
-        println!("{}", url.as_str());
         let response = self.inner.get(url).send().await?.json().await?;
         Ok(response)
     }
