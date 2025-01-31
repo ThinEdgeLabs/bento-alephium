@@ -3,6 +3,10 @@ edition = "2021"
 name = "bento_alephium"
 version = "0.1.0"
 
+[[bin]]
+name = "bento_alephium"
+path = "src/bin/main.rs"
+
 [dependencies]
 diesel = {version = "2.1.4", features = [
   "postgres",
@@ -31,3 +35,4 @@ tokio = {version = "1.42.0", features = ["full"]}
 tokio-tungstenite = "0.26.1"
 tracing = "0.1.41"
 url = "2.5.4"
+actix-web = "4.0.0"

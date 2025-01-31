@@ -1,0 +1,51 @@
+version: '3'
+
+tasks:
+  # Start the application for development
+  up:
+    desc: Start the application using Docker Compose for development
+    cmds:
+      - docker-compose -f docker-compose.yml up --build
+
+  # Stop the application and remove volumes (database)
+  down-and-remove-volumes:
+    desc: Stop the application and remove volumes
+    cmds:
+      - docker-compose down --volumes --remove-orphans
+
+  # Stop the application without removing volumes (database)
+  down:
+    desc: Stop the application and remove volumes
+    cmds:
+      - docker-compose down
+
+  # Check database connectivity
+  check-db:
+    desc: Check database connectivity from the indexer service
+    cmds:
+      - docker exec -it bento-alephium-indexer_service-1 pg_isready -h bento_db_service -p 5432 -U bento_user
+
+  # Enter the database container
+  db-shell:
+    desc: Open a shell in the database container
+    cmds:
+      - docker exec -it bento-alephium-bento_db_service-1 sh
+
+  # Enter the indexer container
+  indexer-shell:
+    desc: Open a shell in the indexer container
+    cmds:
+      - docker exec -it bento-alephium-indexer_service-1 sh
+
+  # Genesis command to reset everything from scratch
+  genesis:
+    desc: Reset the project from scratch (remove containers, volumes, and data)
+    cmds:
+      - echo "Stopping all containers and removing volumes..."
+      - docker-compose down --volumes --remove-orphans
+      - echo "Removing Docker network..."
+      - docker network prune -f
+      - echo "Removing unused Docker volumes..."
+      - docker volume prune -f
+      - echo "Rebuilding and restarting the application..."
+      - docker-compose -f docker-compose.yml up --build
