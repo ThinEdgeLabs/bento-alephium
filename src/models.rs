@@ -6,6 +6,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
 #[diesel(table_name = crate::schema::blocks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+
+/// Represents a block in the blockchain.
+///
+/// A block contains information related to its position within the blockchain, the transactions it contains,
+/// and other associated metadata. The `Block` struct is used to interact with the `blocks` table in the database.
 pub struct Block {
     pub hash: String,
     pub timestamp: NaiveDateTime,
@@ -24,7 +29,10 @@ pub struct Block {
     pub parent_hash: Option<String>,
     pub uncles: serde_json::Value,
 }
-
+/// Represents an event related to a blockchain transaction.
+///
+/// An event is tied to a specific transaction and contract address, with additional metadata in `fields` 
+/// that can vary depending on the event's nature. The `Event` struct interacts with the `events` table.
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, AsChangeset)]
 #[diesel(table_name = crate::schema::events)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -34,7 +42,10 @@ pub struct Event {
     pub event_index: i32,
     pub fields: serde_json::Value,
 }
-
+/// Represents a blockchain transaction.
+///
+/// A transaction includes metadata such as its hash, script execution status, input and output details,
+/// and signatures associated with the transaction. The `Transaction` struct interacts with the `transactions` table.
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, Deserialize, AsChangeset)]
 #[diesel(table_name = crate::schema::transactions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]

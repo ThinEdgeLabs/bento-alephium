@@ -1,21 +1,42 @@
+//! This module provides repository implementations for interacting with the database,
+//! specifically handling blocks, events, and transactions using Diesel ORM.
+//! 
+//! The repositories allow CRUD operations and querying based on various parameters.
+
 use crate::{
     db::DbPool,
-    models::{Block, Event, Transaction},
+    models::{self, Block, Event, Transaction},
 };
 use anyhow::Result;
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
+/// Repository for handling block-related database operations.
 pub struct BlockRepository {
     pub pool: DbPool,
 }
 
 impl BlockRepository {
+    /// Retrieves multiple blocks by their hashes.
+    ///
+    /// # Arguments
+    /// * `hashes` - A vector of block hashes.
+    ///
+    /// # Returns
+    /// * `Result<Vec<Block>>` - A vector of blocks matching the given hashes.
     pub fn find_by_hashes(&self, hashes: Vec<String>) -> Result<Vec<Block>> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
         blocks.filter(hash.eq_any(hashes)).load::<Block>(&mut conn).map_err(anyhow::Error::msg)
     }
 
+    /// Retrieves a block by its hash.
+    ///
+    /// # Arguments
+    /// * `hash_val` - The hash value of the block.
+    ///
+    /// # Returns
+    /// * `Result<Option<Block>>` - The block if found, otherwise `None`.
     pub fn find_by_hash(&self, hash_val: &str) -> Result<Option<Block>> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -26,6 +47,13 @@ impl BlockRepository {
             .map_err(anyhow::Error::msg)
     }
 
+    /// Retrieves a block by its height.
+    ///
+    /// # Arguments
+    /// * `height_val` - The height of the block.
+    ///
+    /// # Returns
+    /// * `Result<Option<Block>>` - The block if found, otherwise `None`.
     pub fn find_by_height(&self, height_val: i64) -> Result<Option<Block>> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -36,6 +64,13 @@ impl BlockRepository {
             .map_err(anyhow::Error::msg)
     }
 
+    /// Stores a new block or updates an existing one based on the hash.
+    ///
+    /// # Arguments
+    /// * `block` - The block to store.
+    ///
+    /// # Returns
+    /// * `Result<Block>` - The stored or updated block.
     pub fn store_block(&self, block: Block) -> Result<Block> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -48,6 +83,14 @@ impl BlockRepository {
             .map_err(anyhow::Error::msg)
     }
 
+    /// Updates a block by its hash.
+    ///
+    /// # Arguments
+    /// * `hash_val` - The hash of the block to update.
+    /// * `block` - The new block data.
+    ///
+    /// # Returns
+    /// * `Result<Block>` - The updated block.
     pub fn update_block(&self, hash_val: &str, block: Block) -> Result<Block> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -57,6 +100,13 @@ impl BlockRepository {
             .map_err(anyhow::Error::msg)
     }
 
+    /// Deletes a block by its hash.
+    ///
+    /// # Arguments
+    /// * `hash_val` - The hash of the block to delete.
+    ///
+    /// # Returns
+    /// * `Result<usize>` - The number of deleted rows.
     pub fn delete_block(&self, hash_val: &str) -> Result<usize> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -65,6 +115,14 @@ impl BlockRepository {
             .map_err(anyhow::Error::msg)
     }
 
+    /// Lists blocks with pagination.
+    ///
+    /// # Arguments
+    /// * `limit` - The number of blocks to retrieve.
+    /// * `offset` - The starting position.
+    ///
+    /// # Returns
+    /// * `Result<Vec<Block>>` - A vector of blocks ordered by height in descending order.
     pub fn list_blocks(&self, limit: i64, offset: i64) -> Result<Vec<Block>> {
         use crate::schema::blocks::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -75,13 +133,15 @@ impl BlockRepository {
             .load::<Block>(&mut conn)
             .map_err(anyhow::Error::msg)
     }
+
 }
 
 pub struct EventRepository {
     pub pool: DbPool,
 }
-
+/// Repository for handling event-related database operations.
 impl EventRepository {
+    /// Retrieves an event by its transaction ID.
     pub fn find_by_tx_id(&self, tx_id_val: &str) -> Result<Option<Event>> {
         use crate::schema::events::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -92,7 +152,7 @@ impl EventRepository {
             .optional()
             .map_err(anyhow::Error::msg)
     }
-
+/// Stores or updates an event.
     pub fn store_event(&self, event: Event) -> Result<Event> {
         use crate::schema::events::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -147,6 +207,7 @@ pub struct TransactionRepository {
 }
 
 impl TransactionRepository {
+    /// Retrieves a transaction by its hash.
     pub fn find_by_hash(&self, hash_val: &str) -> Result<Option<Transaction>> {
         use crate::schema::transactions::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -156,7 +217,7 @@ impl TransactionRepository {
             .optional()
             .map_err(anyhow::Error::msg)
     }
-
+ /// Stores or updates a transaction.
     pub fn store_transaction(&self, transaction: Transaction) -> Result<Transaction> {
         use crate::schema::transactions::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -168,7 +229,7 @@ impl TransactionRepository {
             .get_result(&mut conn)
             .map_err(anyhow::Error::msg)
     }
-
+ /// Updates a transaction by its hash.
     pub fn update_transaction(
         &self,
         hash_val: &str,
@@ -181,7 +242,7 @@ impl TransactionRepository {
             .get_result(&mut conn)
             .map_err(anyhow::Error::msg)
     }
-
+ /// Deletes a transaction by its hash.
     pub fn delete_transaction(&self, hash_val: &str) -> Result<usize> {
         use crate::schema::transactions::dsl::*;
         let mut conn = self.pool.get().unwrap();
@@ -189,7 +250,7 @@ impl TransactionRepository {
             .execute(&mut conn)
             .map_err(anyhow::Error::msg)
     }
-
+ /// Lists transactions with pagination.
     pub fn list_transactions(&self, limit: i64, offset: i64) -> Result<Vec<Transaction>> {
         use crate::schema::transactions::dsl::*;
         let mut conn = self.pool.get().unwrap();
