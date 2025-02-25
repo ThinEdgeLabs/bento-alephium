@@ -4,62 +4,82 @@ use axum::Json;
 use crate::api::error::AppError;
 use crate::api::AppState;
 use crate::api::Pagination;
+use crate::models::event::EventModel;
 use crate::repository::{get_events, get_events_by_contract, get_events_by_tx};
 use axum::response::IntoResponse;
-
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
+use utoipa_axum::{router::OpenApiRouter, routes};
 pub struct EventApiModule;
 
 impl EventApiModule {
-    pub fn register() -> axum::Router<crate::api::AppState> {
-        axum::Router::new()
-            .route("/events", axum::routing::get(get_events_handler))
-            .route("/events/contract", axum::routing::get(get_events_by_contract_handler))
-            .route("/events/tx", axum::routing::get(get_events_by_tx_id_handler))
+    pub fn register() -> OpenApiRouter<crate::api::AppState> {
+        OpenApiRouter::new()
+            .routes(routes!(get_events_handler))
+            .routes(routes!(get_events_by_contract_handler))
+            .routes(routes!(get_events_by_tx_id_handler))
     }
 }
-
+#[utoipa::path(get, path = "/",params(Pagination), tag = "Events", responses((status = OK, body = Vec<EventModel>)))]
 pub async fn get_events_handler(
     pagination: Query<Pagination>,
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<Json<Vec<EventModel>>, AppError> {
     let db = state.db;
 
-    let event_models =
-        get_events(db, pagination.limit.unwrap_or(i64::MAX), pagination.offset.unwrap_or(0))
-            .await?;
+    let event_models = get_events(db, pagination.get_limit(), pagination.get_offset()).await?;
     Ok(Json(event_models))
 }
+#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct EventByContractQuery {
+    /// The contract ID to filter events by
+    pub contract: String,
 
+    // Include the pagination fields
+    #[param(inline)]
+    #[serde(flatten)]
+    pub pagination: Pagination,
+}
+#[utoipa::path(get, path = "/contract", params(EventByContractQuery),  tag = "Events", responses((status = OK, body = Vec<EventModel>)))]
 pub async fn get_events_by_contract_handler(
-    address: Query<String>,
-    pagination: Query<Pagination>,
+    Query(query): Query<EventByContractQuery>,
     State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<Json<Vec<EventModel>>, AppError> {
+    let EventByContractQuery { contract, pagination } = query;
     let db = state.db;
-
     let event_models = get_events_by_contract(
         db,
-        address.to_string(),
-        pagination.limit.unwrap_or(i64::MAX),
-        pagination.offset.unwrap_or(0),
+        contract.to_string(),
+        pagination.get_limit(),
+        pagination.get_offset(),
     )
     .await?;
     Ok(Json(event_models))
 }
 
+#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct EventByTxIdQuery {
+    /// The contract ID to filter events by
+    pub tx_id: String,
+
+    // Include the pagination fields
+    #[param(inline)]
+    #[serde(flatten)]
+    pub pagination: Pagination,
+}
+
+#[utoipa::path(get, path = "/tx", params(EventByTxIdQuery),  tag = "Events", responses((status = OK, body = EventModel)))]
 pub async fn get_events_by_tx_id_handler(
-    tx_id: Query<String>,
-    pagination: Query<Pagination>,
+    Query(query): Query<EventByTxIdQuery>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
 
-    let event_models = get_events_by_tx(
-        db,
-        tx_id.to_string(),
-        pagination.limit.unwrap_or(i64::MAX),
-        pagination.offset.unwrap_or(0),
-    )
-    .await?;
+    let EventByTxIdQuery { tx_id, pagination } = query;
+    let event_models =
+        get_events_by_tx(db, tx_id.to_string(), pagination.get_limit(), pagination.get_offset())
+            .await?;
     Ok(Json(event_models))
 }

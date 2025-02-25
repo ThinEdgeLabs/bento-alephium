@@ -1,9 +1,14 @@
 use anyhow::Result;
 use axum::{routing::get, Router};
+use utoipa::openapi::Info;
 
 use super::AppState;
+use crate::api::handler::event::__path_get_events_handler;
+use crate::api::handler::event::get_events_handler;
 use crate::api::handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use crate::config::Config;
+use utoipa_axum::{router::OpenApiRouter, routes, PathItemExt};
+use utoipa_swagger_ui::SwaggerUi;
 
 pub async fn start(config: Config) -> Result<()> {
     // initialize tracing
@@ -13,7 +18,11 @@ pub async fn start(config: Config) -> Result<()> {
     let state = AppState { db: config.db_client };
 
     // create our application stack
-    let app = configure_api().with_state(state);
+    let (app, mut api) = configure_api().with_state(state).split_for_parts();
+
+    api.info = Info::new("Alephium REST API", "v1");
+    api.info.description = Some("Bento Alephium Indexer REST API".to_string());
+    let app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
     let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
     let port = std::env::var("PORT").unwrap_or("3000".to_string());
@@ -32,11 +41,11 @@ async fn root() -> &'static str {
 
 /// Setup the API routes
 #[allow(clippy::let_and_return)]
-pub fn configure_api() -> Router<AppState> {
-    let router = Router::new()
-        .merge(BlockApiModule::register())
-        .merge(TransactionApiModule::register())
-        .merge(EventApiModule::register())
+pub fn configure_api() -> OpenApiRouter<AppState> {
+    let router = OpenApiRouter::new()
+        .nest("/blocks", BlockApiModule::register())
+        .nest("/events", EventApiModule::register())
+        .nest("/transactions", TransactionApiModule::register())
         .route("/", get(root));
 
     // Users can extend with their modules:
