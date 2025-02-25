@@ -2,6 +2,7 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::api::error::AppError;
+use crate::api::handler::dto::event::EventByContractQuery;
 use crate::api::AppState;
 use crate::api::Pagination;
 use crate::models::event::EventModel;
@@ -30,17 +31,7 @@ pub async fn get_events_handler(
     let event_models = get_events(db, pagination.get_limit(), pagination.get_offset()).await?;
     Ok(Json(event_models))
 }
-#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct EventByContractQuery {
-    /// The contract ID to filter events by
-    pub contract: String,
 
-    // Include the pagination fields
-    #[param(inline)]
-    #[serde(flatten)]
-    pub pagination: Pagination,
-}
 #[utoipa::path(get, path = "/contract", params(EventByContractQuery),  tag = "Events", responses((status = OK, body = Vec<EventModel>)))]
 pub async fn get_events_by_contract_handler(
     Query(query): Query<EventByContractQuery>,

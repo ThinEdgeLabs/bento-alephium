@@ -1,13 +1,11 @@
 use anyhow::Result;
-use axum::{routing::get, Router};
+use axum::routing::get;
 use utoipa::openapi::Info;
 
 use super::AppState;
-use crate::api::handler::event::__path_get_events_handler;
-use crate::api::handler::event::get_events_handler;
 use crate::api::handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use crate::config::Config;
-use utoipa_axum::{router::OpenApiRouter, routes, PathItemExt};
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 pub async fn start(config: Config) -> Result<()> {

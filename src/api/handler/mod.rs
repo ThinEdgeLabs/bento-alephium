@@ -3,6 +3,7 @@ use axum::Router;
 use super::AppState;
 
 pub mod block;
+pub mod dto;
 pub mod event;
 pub mod transaction;
 
