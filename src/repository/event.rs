@@ -47,7 +47,7 @@ pub async fn get_events_by_contract(
 
 pub async fn get_events_by_tx(
     db: Arc<DbPool>,
-    contract_address_value: String,
+    tx_id_value: String,
     limit: i64,
     offset: i64,
 ) -> Result<Vec<EventModel>> {
@@ -56,7 +56,7 @@ pub async fn get_events_by_tx(
     let mut conn = db.get().await?;
 
     let event_models: Vec<EventModel> = events
-        .filter(contract_address.eq(contract_address_value))
+        .filter(tx_id.eq(tx_id_value))
         .limit(limit)
         .offset(offset)
         .select(EventModel::as_select())
