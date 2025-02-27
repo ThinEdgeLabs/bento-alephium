@@ -21,8 +21,11 @@ impl ProcessorConfig {
     }
 }
 
+#[derive(Clone)]
 pub struct Config {
     pub db_client: Arc<DbPool>,
+    pub api_host: String,
+    pub api_port: u16,
 }
 
 impl Config {
@@ -30,6 +33,14 @@ impl Config {
         let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let db_client =
             new_db_pool(&db_url, None).await.context("Failed to create connection pool")?;
-        Ok(Self { db_client })
+
+            let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
+            let port = std::env::var("PORT").unwrap_or("3000".to_string());
+
+        Ok(Self { db_client, api_host: host, api_port: port.parse().unwrap() })
+    }
+
+    pub fn api_endpoint(&self) -> String {
+        format!("{}:{}", self.api_host, self.api_port)
     }
 }

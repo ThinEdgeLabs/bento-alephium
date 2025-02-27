@@ -48,7 +48,7 @@ pub struct BlockHeightQuery {
     )
 )]
 pub async fn get_blocks_handler(
-    pagination: Query<Pagination>,
+    Query(pagination): Query<Pagination>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;

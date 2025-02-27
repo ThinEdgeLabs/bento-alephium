@@ -14,24 +14,25 @@ pub struct AppState {
 
 // The query parameters for todos index
 #[derive(Debug, Deserialize, ToSchema, Serialize, Default, IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
 pub struct Pagination {
     /// The number of items to skip (optional)
-    #[schema(default = 0)]
-    pub offset: Option<String>,
+    #[param(style = Form, explode, example = json!(0), default=json!(0))]
+    pub offset: i64,
 
     /// The maximum number of items to return (optional)
-    #[schema(default = 10)]
-    pub limit: Option<String>,
+    #[param(style = Form, explode, allow_reserved, example = json!(10), default=json!(0))]
+    pub limit: i64,
 }
 
 impl Pagination {
     // Helper method to parse offset with fallback to default
     pub fn get_offset(&self) -> i64 {
-        self.offset.as_ref().and_then(|s| s.parse::<i64>().ok()).unwrap_or(10)
+        self.offset
     }
 
     // Helper method to parse limit with fallback to default
     pub fn get_limit(&self) -> i64 {
-        self.limit.as_ref().and_then(|s| s.parse::<i64>().ok()).unwrap_or(10)
+        self.limit
     }
 }
