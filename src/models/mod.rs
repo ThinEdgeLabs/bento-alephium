@@ -26,7 +26,7 @@ pub fn convert_bwe_to_block_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Bloc
                 txs_hash: b.txs_hash.to_string(),
                 tx_number: b.transactions.len() as i64,
                 target: b.target,
-                main_chain: b.main_chain,
+                main_chain: b.main_chain.unwrap_or(false),
                 ghost_uncles: serde_json::to_value(b.ghost_uncles).unwrap_or_default(),
             });
         }

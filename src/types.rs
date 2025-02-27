@@ -36,9 +36,10 @@ pub struct BlockEntry {
     pub dep_state_hash: String,
     pub txs_hash: String,
     pub target: String,
-    pub parent: BlockHash,
-    pub main_chain: bool,
     pub ghost_uncles: Vec<GhostUncleBlockEntry>,
+
+    pub parent: Option<BlockHash>,
+    pub main_chain: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
