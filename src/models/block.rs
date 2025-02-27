@@ -4,11 +4,12 @@ use serde::Serialize;
 
 use crate::types::{BlockHash, DEFAULT_GROUP_NUM};
 
-#[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
+#[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset, Identifiable)]
 #[diesel(table_name = crate::schema::blocks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(primary_key(hash))]
 pub struct BlockModel {
-    pub hash: String,
+    pub hash: BlockHash,
     pub timestamp: NaiveDateTime,
     pub chain_from: i64,
     pub chain_to: i64,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 pub const DEFAULT_GROUP_NUM: i64 = 4;
 pub const REORG_TIMEOUT: i64 = 210 * 16 * 1000; // 210 blocks * 16 seconds
@@ -35,9 +36,10 @@ pub struct BlockEntry {
     pub dep_state_hash: String,
     pub txs_hash: String,
     pub target: String,
-    pub parent: BlockHash,
-    pub main_chain: bool,
     pub ghost_uncles: Vec<GhostUncleBlockEntry>,
+
+    pub parent: Option<BlockHash>,
+    pub main_chain: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -63,7 +65,7 @@ pub struct BlocksPerTimestampRange {
     pub blocks: Vec<Vec<BlockEntry>>, // A list of block entries per timestamp range.
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
 pub enum EventFieldType {
     Bool,
     I256,
@@ -73,7 +75,7 @@ pub enum EventFieldType {
 }
 
 // Parsing event fields helper
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct EventField {
     #[serde(rename = "type")]
     pub field_type: EventFieldType,
@@ -94,7 +96,7 @@ pub struct BlocksAndEventsPerTimestampRange {
     pub blocks_and_events: Vec<Vec<BlockAndEvents>>, // A list of blocks and events grouped by timestamp range.
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractEventByBlockHash {
     pub tx_id: String,

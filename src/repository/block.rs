@@ -6,7 +6,7 @@ use crate::{db::DbPool, models::block::BlockModel};
 use anyhow::Result;
 use diesel::ExpressionMethods;
 
-use diesel::query_dsl::methods::SelectDsl;
+use diesel::query_dsl::methods::{LimitDsl, OffsetDsl, SelectDsl};
 use diesel_async::RunQueryDsl;
 
 /// Insert blocks into the database.
@@ -69,4 +69,28 @@ pub async fn fetch_block_hashes_at_height_filter_one(
         .await?;
 
     Ok(block_hashes)
+}
+
+pub async fn get_blocks(db: Arc<DbPool>, limit: i64, offset: i64) -> Result<Vec<BlockModel>> {
+    use crate::schema::blocks::dsl::*;
+
+    let mut conn = db.get().await?;
+    let block_models =
+        blocks.limit(limit).offset(offset).select(BlockModel::as_select()).load(&mut conn).await?;
+
+    Ok(block_models)
+}
+
+pub async fn get_block_by_height(db: Arc<DbPool>, height_value: i64) -> Result<Option<BlockModel>> {
+    use crate::schema::blocks::dsl::*;
+
+    let mut conn = db.get().await?;
+    let block_model = blocks
+        .filter(height.eq(height_value))
+        .select(BlockModel::as_select())
+        .first(&mut conn)
+        .await
+        .ok();
+
+    Ok(block_model)
 }
