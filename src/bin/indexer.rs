@@ -13,9 +13,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::LendingContractProcessor(
-        "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF".into(),
-    );
+    // let processor_config = ProcessorConfig::LendingContractProcessor(
+    //     "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF".into(),
+    // );
+
+    let processor_config = ProcessorConfig::EventProcessor;
 
     let mut worker = Worker::new(
         processor_config,

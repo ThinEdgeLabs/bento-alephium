@@ -11,6 +11,8 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
+
+use super::dto::block;
 pub struct BlockApiModule;
 
 impl BlockApiModule {
@@ -73,6 +75,9 @@ pub async fn get_block_by_hash_handler(
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
     let block_model = get_block_by_hash(db, &query.hash).await?;
+    if block_model.is_none() {
+        return Err(AppError::NotFound("Block not found".to_string()));
+    }
     Ok(Json(block_model))
 }
 
@@ -93,6 +98,11 @@ pub async fn get_block_by_height_handler(
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
     let block_model = get_block_by_height(db, query.height).await?;
+
+    if block_model.is_none() {
+        return Err(AppError::NotFound("Block not found".to_string()));
+    }
+
     Ok(Json(block_model))
 }
 
@@ -113,5 +123,6 @@ pub async fn get_block_transactions_handler(
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
     let transaction_models = get_block_transactions(db, query.hash).await?;
+    
     Ok(Json(transaction_models))
 }
