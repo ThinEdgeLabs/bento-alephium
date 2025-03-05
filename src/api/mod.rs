@@ -11,28 +11,52 @@ pub mod index;
 pub struct AppState {
     pub db: Arc<DbPool>,
 }
+use std::str::FromStr;
 
-// The query parameters for todos index
-#[derive(Debug, Deserialize, ToSchema, Serialize, Default, IntoParams)]
-#[into_params(style = Form, parameter_in = Query)]
+#[derive(Debug, Clone, Default, Deserialize, ToSchema, Serialize)]
 pub struct Pagination {
-    /// The number of items to skip (optional)
-    #[param(style = Form, explode, example = json!(0), default=json!(0))]
+    #[serde(
+        default = "Pagination::default_offset",
+        deserialize_with = "deserialize_number_from_string"
+    )]
     pub offset: i64,
 
-    /// The maximum number of items to return (optional)
-    #[param(style = Form, explode, allow_reserved, example = json!(10), default=json!(0))]
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub limit: i64,
 }
 
+// Custom deserializer for string to i64 conversion
+pub fn deserialize_number_from_string<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    if s.is_empty() {
+        return Ok(0);
+    }
+    i64::from_str(&s).map_err(serde::de::Error::custom)
+}
+
 impl Pagination {
-    // Helper method to parse offset with fallback to default
     pub fn get_offset(&self) -> i64 {
+        if self.offset < 0 {
+            return 0;
+        }
         self.offset
     }
 
-    // Helper method to parse limit with fallback to default
     pub fn get_limit(&self) -> i64 {
+        if self.limit <= 0 || self.limit > 100 {
+            return 10;
+        }
         self.limit
+    }
+
+    pub fn default_offset() -> i64 {
+        0
+    }
+
+    pub fn default_limit() -> i64 {
+        10
     }
 }

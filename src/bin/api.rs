@@ -9,6 +9,5 @@ async fn main() -> anyhow::Result<()> {
     println!("Swagger UI is available at http://{}/swagger-ui", config.api_endpoint());
     start(config).await?;
 
-
     Ok(())
 }

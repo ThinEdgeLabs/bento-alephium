@@ -1,4 +1,7 @@
+use std::ops::RangeBounds;
+
 use crate::types::BlockAndEvents;
+use rand::Rng;
 
 pub mod block;
 pub mod event;
@@ -40,7 +43,7 @@ pub fn convert_bwe_to_event_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Even
         for be in bes {
             for e in be.events {
                 models.push(EventModel {
-                    id: 0,
+                    id: uuid::Uuid::new_v4().to_string(),
                     tx_id: e.tx_id,
                     contract_address: e.contract_address,
                     event_index: e.event_index,

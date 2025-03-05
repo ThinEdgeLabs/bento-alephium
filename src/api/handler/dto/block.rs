@@ -1,7 +1,7 @@
-use serde::Serialize;
-use utoipa::ToSchema;
+use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
-use crate::models::block::BlockModel;
+use crate::{api::Pagination, models::block::BlockModel, types::Order};
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BlockDto {
@@ -41,4 +41,29 @@ impl From<BlockModel> for BlockDto {
             ghost_uncles: model.ghost_uncles,
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct BlocksQuery {
+    #[serde(flatten)]
+    #[param(inline, example = json!({"offset": 0, "limit": 10}))]
+    pub pagination: Pagination,
+
+    #[param(inline)]
+    pub order: Order,
+}
+
+#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct BlockByHeightQuery {
+    /// The block height to retrieve
+    pub height: i64,
+}
+
+#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct BlockByHashQuery {
+    /// The block hash to retrieve
+    pub hash: String,
 }

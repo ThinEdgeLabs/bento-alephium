@@ -34,8 +34,8 @@ impl Config {
         let db_client =
             new_db_pool(&db_url, None).await.context("Failed to create connection pool")?;
 
-            let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
-            let port = std::env::var("PORT").unwrap_or("3000".to_string());
+        let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
+        let port = std::env::var("PORT").unwrap_or("3000".to_string());
 
         Ok(Self { db_client, api_host: host, api_port: port.parse().unwrap() })
     }

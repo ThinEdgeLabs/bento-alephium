@@ -2,8 +2,8 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::api::error::AppError;
-use crate::api::handler::dto::BlockDto;
-use crate::api::handler::dto::TransactionDto;
+use crate::api::handler::dto::{BlockByHeightQuery, TransactionDto};
+use crate::api::handler::dto::{BlockDto, BlocksQuery};
 use crate::api::Pagination;
 use crate::repository::{get_block_by_hash, get_block_by_height, get_block_transactions};
 use crate::{api::AppState, repository::get_blocks};
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use super::dto::block;
+use super::dto::{block, BlockByHashQuery};
 pub struct BlockApiModule;
 
 impl BlockApiModule {
@@ -25,36 +25,24 @@ impl BlockApiModule {
     }
 }
 
-#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct BlockHashQuery {
-    /// The block hash to retrieve
-    pub hash: String,
-}
-
-#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct BlockHeightQuery {
-    /// The block height to retrieve
-    pub height: i64,
-}
-
 #[utoipa::path(
     get,
     path = "/",
     tag = "Blocks",
-    params(Pagination),
+    params(BlocksQuery),
     responses(
         (status = 200, description = "List of blocks retrieved successfully", body = Vec<BlockDto>),
         (status = 500, description = "Internal server error")
     )
 )]
 pub async fn get_blocks_handler(
-    Query(pagination): Query<Pagination>,
+    Query(query): Query<BlocksQuery>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
-    let block_models = get_blocks(db, pagination.get_limit(), pagination.get_offset()).await?;
+    let pagination = query.pagination;
+    let block_models =
+        get_blocks(db, pagination.get_limit(), pagination.get_offset(), Some(query.order)).await?;
     Ok(Json(block_models))
 }
 
@@ -62,7 +50,7 @@ pub async fn get_blocks_handler(
     get,
     path = "/hash",
     tag = "Blocks",
-    params(BlockHashQuery),
+    params(BlockByHashQuery),
     responses(
         (status = 200, description = "Block retrieved successfully", body = BlockDto),
         (status = 404, description = "Block not found"),
@@ -70,7 +58,7 @@ pub async fn get_blocks_handler(
     )
 )]
 pub async fn get_block_by_hash_handler(
-    Query(query): Query<BlockHashQuery>,
+    Query(query): Query<BlockByHashQuery>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
@@ -85,7 +73,7 @@ pub async fn get_block_by_hash_handler(
     get,
     path = "/height",
     tag = "Blocks",
-    params(BlockHeightQuery),
+    params(BlockByHeightQuery),
     responses(
         (status = 200, description = "Block retrieved successfully", body = BlockDto),
         (status = 404, description = "Block not found"),
@@ -93,7 +81,7 @@ pub async fn get_block_by_hash_handler(
     )
 )]
 pub async fn get_block_by_height_handler(
-    Query(query): Query<BlockHeightQuery>,
+    Query(query): Query<BlockByHeightQuery>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
@@ -110,7 +98,7 @@ pub async fn get_block_by_height_handler(
     get,
     path = "/transactions",
     tag = "Blocks",
-    params(BlockHashQuery),
+    params(BlockByHashQuery),
     responses(
         (status = 200, description = "Block transactions retrieved successfully", body = Vec<TransactionDto>),
         (status = 404, description = "Block not found"),
@@ -118,11 +106,11 @@ pub async fn get_block_by_height_handler(
     )
 )]
 pub async fn get_block_transactions_handler(
-    Query(query): Query<BlockHashQuery>,
+    Query(query): Query<BlockByHashQuery>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
     let transaction_models = get_block_transactions(db, query.hash).await?;
-    
+
     Ok(Json(transaction_models))
 }

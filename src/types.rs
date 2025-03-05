@@ -198,6 +198,12 @@ pub struct TimestampRange {
     pub to: u64,
 }
 
+#[derive(Deserialize, Debug, Clone, Serialize, ToSchema)]
+pub enum Order {
+    Asc,
+    Desc,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

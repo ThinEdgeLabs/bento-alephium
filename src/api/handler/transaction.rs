@@ -28,11 +28,17 @@ pub struct TransactionHashQuery {
     pub hash: String,
 }
 
+#[derive(Debug, Deserialize, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct TransactionsQuery {
+    #[serde(flatten)]
+    pub pagination: Pagination,
+}
 #[utoipa::path(
     get,
     path = "/",
     tag = "Transactions",
-    params(Pagination),
+    params(TransactionsQuery),
     responses(
         (status = 200, description = "List of transactions retrieved successfully", body = Vec<TransactionDto>),
         (status = 500, description = "Internal server error")

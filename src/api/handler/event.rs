@@ -8,9 +8,11 @@ use crate::api::Pagination;
 use crate::models::event::EventModel;
 use crate::repository::{get_events, get_events_by_contract, get_events_by_tx};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
+
+use super::dto::{EventByTxIdQuery, EventDto};
 pub struct EventApiModule;
 
 impl EventApiModule {
@@ -21,7 +23,14 @@ impl EventApiModule {
             .routes(routes!(get_events_by_tx_id_handler))
     }
 }
-#[utoipa::path(get, path = "/",params(Pagination), tag = "Events", responses((status = OK, body = Vec<EventModel>)))]
+
+#[derive(Debug, IntoParams, ToSchema, Serialize)]
+pub struct EventsQuery {
+    #[serde(flatten)]
+    pub pagination: Pagination,
+}
+
+#[utoipa::path(get, path = "/",params(EventsQuery), tag = "Events", responses((status = OK, body = Vec<EventModel>)))]
 pub async fn get_events_handler(
     pagination: Query<Pagination>,
     State(state): State<AppState>,
@@ -49,18 +58,6 @@ pub async fn get_events_by_contract_handler(
     Ok(Json(event_models))
 }
 
-#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct EventByTxIdQuery {
-    /// The contract ID to filter events by
-    pub tx_id: String,
-
-    // Include the pagination fields
-    #[param(inline)]
-    #[serde(flatten)]
-    pub pagination: Pagination,
-}
-
 #[utoipa::path(get, path = "/tx", params(EventByTxIdQuery),  tag = "Events", responses((status = OK, body = EventModel)))]
 pub async fn get_events_by_tx_id_handler(
     Query(query): Query<EventByTxIdQuery>,
@@ -72,5 +69,7 @@ pub async fn get_events_by_tx_id_handler(
     let event_models =
         get_events_by_tx(db, tx_id.to_string(), pagination.get_limit(), pagination.get_offset())
             .await?;
-    Ok(Json(event_models))
+
+    let events: Vec<EventDto> = event_models.into_iter().map(|event| event.into()).collect();
+    Ok(Json(events))
 }
