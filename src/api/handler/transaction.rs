@@ -2,13 +2,11 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::api::error::AppError;
-use crate::api::handler::dto::TransactionDto;
+use crate::api::handler::dto::{TransactionDto, TransactionHashQuery, TransactionsQuery};
 use crate::api::AppState;
 use crate::api::Pagination;
 use crate::repository::{get_tx_by_hash, get_txs};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub struct TransactionApiModule;
@@ -21,19 +19,6 @@ impl TransactionApiModule {
     }
 }
 
-#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct TransactionHashQuery {
-    /// The transaction hash to retrieve
-    pub hash: String,
-}
-
-#[derive(Debug, Deserialize, IntoParams, ToSchema, Serialize)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct TransactionsQuery {
-    #[serde(flatten)]
-    pub pagination: Pagination,
-}
 #[utoipa::path(
     get,
     path = "/",

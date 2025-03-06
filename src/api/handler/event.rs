@@ -3,13 +3,12 @@ use axum::Json;
 
 use crate::api::error::AppError;
 use crate::api::handler::dto::event::EventByContractQuery;
+use crate::api::handler::dto::EventsQuery;
 use crate::api::AppState;
 use crate::api::Pagination;
 use crate::models::event::EventModel;
 use crate::repository::{get_events, get_events_by_contract, get_events_by_tx};
 use axum::response::IntoResponse;
-use serde::Serialize;
-use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use super::dto::{EventByTxIdQuery, EventDto};
@@ -22,12 +21,6 @@ impl EventApiModule {
             .routes(routes!(get_events_by_contract_handler))
             .routes(routes!(get_events_by_tx_id_handler))
     }
-}
-
-#[derive(Debug, IntoParams, ToSchema, Serialize)]
-pub struct EventsQuery {
-    #[serde(flatten)]
-    pub pagination: Pagination,
 }
 
 #[utoipa::path(get, path = "/",params(EventsQuery), tag = "Events", responses((status = OK, body = Vec<EventModel>)))]

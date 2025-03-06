@@ -24,6 +24,14 @@ impl From<EventModel> for EventDto {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct EventsQuery {
+    #[serde(flatten)]
+    #[param(inline, example = json!({"offset": 0, "limit": 10}))]
+    pub pagination: Pagination,
+}
+
 #[derive(Debug, Default, Deserialize, IntoParams, ToSchema, Serialize)]
 #[into_params(style = Form, parameter_in = Query)]
 pub struct EventByContractQuery {

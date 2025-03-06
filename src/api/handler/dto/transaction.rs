@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
-use crate::models::transaction::TransactionModel;
+use crate::{api::Pagination, models::transaction::TransactionModel};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TransactionDto {
@@ -34,4 +34,19 @@ impl From<TransactionModel> for TransactionDto {
             block_hash: model.block_hash.to_string(),
         }
     }
+}
+
+#[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct TransactionHashQuery {
+    /// The transaction hash to retrieve
+    pub hash: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams, ToSchema, Serialize)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct TransactionsQuery {
+    #[serde(flatten)]
+    #[param(inline, example = json!({"offset": 0, "limit": 10}))]
+    pub pagination: Pagination,
 }
