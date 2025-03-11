@@ -51,3 +51,5 @@ pub fn convert_bwe_to_event_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Even
     }
     models
 }
+
+// pub fn convert_bwe_

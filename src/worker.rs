@@ -10,9 +10,7 @@ use crate::{
     db::{new_db_pool, DbPool},
     models::{block::BlockModel, convert_bwe_to_block_models},
     processors::{
-        block_processor::BlockProcessor, default_processor::DefaultProcessor,
-        event_processor::EventProcessor, lending_marketplace_processor::LendingContractProcessor,
-        Processor, ProcessorTrait,
+        block_processor::BlockProcessor, default_processor::DefaultProcessor, event_processor::EventProcessor, lending_marketplace_processor::LendingContractProcessor, tx_processor::TxProcessor, Processor, ProcessorTrait
     },
     repository::{get_block_by_hash, insert_blocks_to_db, update_main_chain},
     schema::processor_status,
@@ -256,7 +254,8 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> Proces
                 db_pool,
                 contract_address.clone(),
             ))
-        }
+        },
+        ProcessorConfig::TxProcessor => Processor::TxProcessor(TxProcessor::new(db_pool)),
     }
 }
 

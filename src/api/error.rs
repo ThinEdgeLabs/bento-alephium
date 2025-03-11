@@ -90,7 +90,7 @@ impl From<anyhow::Error> for AppError {
     fn from(error: anyhow::Error) -> Self {
         // categorize based on error message content
 
-        let error_msg = error.to_string();
+        let error_msg = error.to_string().to_lowercase();
 
         if error_msg.contains("database") || error_msg.contains("SQL") {
             AppError::DatabaseError(error)

@@ -9,12 +9,14 @@ use default_processor::DefaultProcessor;
 use diesel_async::{pooled_connection::bb8::Pool, AsyncPgConnection};
 use event_processor::EventProcessor;
 use lending_marketplace_processor::LendingContractProcessor;
+use tx_processor::TxProcessor;
 use std::{fmt::Debug, sync::Arc};
 
 pub mod block_processor;
 pub mod default_processor;
 pub mod event_processor;
 pub mod lending_marketplace_processor;
+pub mod tx_processor;
 
 /// Base trait for all processors
 #[async_trait]
@@ -58,6 +60,7 @@ pub enum Processor {
     DefaultProcessor(DefaultProcessor),
     EventProcessor(EventProcessor),
     LendingContractProcessor(LendingContractProcessor),
+    TxProcessor(TxProcessor)
 }
 
 #[async_trait]
@@ -68,6 +71,7 @@ impl ProcessorTrait for Processor {
             Processor::BlockProcessor(p) => p.connection_pool(),
             Processor::EventProcessor(p) => p.connection_pool(),
             Processor::LendingContractProcessor(p) => p.connection_pool(),
+            Processor::TxProcessor(p) => p.connection_pool()
         }
     }
 
@@ -77,6 +81,7 @@ impl ProcessorTrait for Processor {
             Processor::BlockProcessor(p) => p.name(),
             Processor::EventProcessor(p) => p.name(),
             Processor::LendingContractProcessor(p) => p.name(),
+            Processor::TxProcessor(p) => p.name()
         }
     }
 
@@ -92,7 +97,8 @@ impl ProcessorTrait for Processor {
             Processor::EventProcessor(p) => p.process_blocks(from_ts, to_ts, blocks).await,
             Processor::LendingContractProcessor(p) => {
                 p.process_blocks(from_ts, to_ts, blocks).await
-            }
+            },
+            Processor::TxProcessor(p) => p.process_blocks(from_ts, to_ts, blocks).await
         }
     }
 }
