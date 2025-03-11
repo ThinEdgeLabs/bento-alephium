@@ -93,7 +93,7 @@ impl From<anyhow::Error> for AppError {
         let error_msg = error.to_string();
 
         if error_msg.contains("database") || error_msg.contains("SQL") {
-            AppError::DatabaseError(error.into())
+            AppError::DatabaseError(error)
         } else if error_msg.contains("validation") {
             AppError::ValidationError(error_msg)
         } else if error_msg.contains("authentication") || error_msg.contains("unauthorized") {
@@ -101,7 +101,7 @@ impl From<anyhow::Error> for AppError {
         } else if error_msg.contains("not found") {
             AppError::NotFound(error_msg)
         } else {
-            AppError::Internal(error.into())
+            AppError::Internal(error)
         }
     }
 }
