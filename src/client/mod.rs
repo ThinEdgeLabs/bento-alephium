@@ -1,13 +1,7 @@
 pub mod block;
 pub mod transaction;
-use crate::{traits::{BlockProvider, TransactionProvider}, types::{
-    BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
-    BlocksPerTimestampRange, Transaction,
-}};
-use anyhow::Result;
+
 use std::env;
-use url::Url;
-use async_trait::async_trait;
 #[derive(Clone, Debug)]
 pub enum Network {
     Development,

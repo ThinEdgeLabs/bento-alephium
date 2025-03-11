@@ -5,16 +5,9 @@ use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
 
 use crate::{
-    client::{Client, Network},
-    config::ProcessorConfig,
-    db::{new_db_pool, DbPool},
-    models::{block::BlockModel, convert_bwe_to_block_models},
-    processors::{
+    client::{Client, Network}, config::ProcessorConfig, db::{new_db_pool, DbPool}, models::{block::BlockModel, convert_bwe_to_block_models}, processors::{
         block_processor::BlockProcessor, default_processor::DefaultProcessor, event_processor::EventProcessor, lending_marketplace_processor::LendingContractProcessor, tx_processor::TxProcessor, Processor, ProcessorTrait
-    },
-    repository::{get_block_by_hash, insert_blocks_to_db, update_main_chain},
-    schema::processor_status,
-    types::REORG_TIMEOUT,
+    }, repository::{get_block_by_hash, insert_blocks_to_db, update_main_chain}, schema::processor_status, traits::BlockProvider, types::REORG_TIMEOUT
 };
 #[derive(Debug, Default)]
 pub struct SyncOptions {
