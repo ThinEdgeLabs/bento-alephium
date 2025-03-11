@@ -22,7 +22,7 @@ impl TransactionProvider for Client {
         Ok(response)
     }
 
-    /// List transactions with pagination.
+    /// List transactions of a block with pagination.
     /// GET:/blocks/{block_hash}/transactions?limit={limit}&offset={offset}
     async fn get_block_txs(&self, block_hash: String, limit: i64, offset: i64) -> Result<Vec<Transaction>> {
         let endpoint = format!("blocks/{block_hash}/transactions?limit={limit}&offset={offset}");
@@ -30,7 +30,5 @@ impl TransactionProvider for Client {
         let response = self.inner.get(url).send().await?.json().await?;
         Ok(response)
     }
-
-
 
 }

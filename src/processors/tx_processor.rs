@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{config::ProcessorConfig, db::DbPool, types::BlockAndEvents};
+use crate::{config::ProcessorConfig, db::DbPool, models::convert_bwe_to_tx_models, repository::insert_txs_to_db, types::{BlockAndEvents, Transaction}};
 
 use super::ProcessorTrait;
 
@@ -43,9 +43,20 @@ impl ProcessorTrait for TxProcessor {
         &self,
         _from: i64,
         _to: i64,
-        _blocks: Vec<Vec<BlockAndEvents>>,
+        blocks: Vec<Vec<BlockAndEvents>>,
     ) -> Result<()> {
-        // Process blocks and events
+        let models = convert_bwe_to_tx_models(blocks);
+        // 
+
+        if !models.is_empty() {
+            tracing::info!(
+                processor_name = ?self.name(),
+                count = ?models.len(),
+                "Found models to insert"
+            );
+            insert_txs_to_db(self.connection_pool.clone(), models).await?;
+        }
         Ok(())
+        
     }
 }
