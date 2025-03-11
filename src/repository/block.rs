@@ -120,3 +120,17 @@ pub async fn get_block_by_height(db: Arc<DbPool>, height_value: i64) -> Result<O
 
     Ok(block_model)
 }
+
+pub async fn exists_block(db: Arc<DbPool>, block_hash_value: &str) -> Result<bool> {
+    use crate::schema::blocks::dsl::*;
+
+    let mut conn = db.get().await?;
+    let block_exists = blocks
+        .filter(hash.eq(block_hash_value))
+        .select(BlockModel::as_select())
+        .first(&mut conn)
+        .await
+        .is_ok();
+
+    Ok(block_exists)
+}

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use diesel::insert_into;
+use serde_json::error;
 
 use crate::{db::DbPool, models::transaction::TransactionModel};
 use anyhow::Result;
@@ -47,4 +48,27 @@ pub async fn get_tx_by_hash(
         .ok();
     Ok(tx)
 }
+
+/// Get transaction by block
+pub async fn get_txs_by_block(
+    db: Arc<DbPool>,
+    block_hash_value: &str,
+) -> Result<Vec<TransactionModel>> {
+    use crate::schema::transactions::dsl::*;
+
+    // Check if block exists
+    let block_exists = crate::repository::block::exists_block(db.clone(), block_hash_value).await?;
+    if !block_exists {
+        return Err(anyhow::anyhow!("Block not found"));
+    }
+    let mut conn = db.get().await?;
+    let txs = transactions
+        .filter(block_hash.eq(block_hash_value))
+        .select(TransactionModel::as_select())
+        .load(&mut conn)
+        .await?;
+
+    Ok(txs)
+}
+
 

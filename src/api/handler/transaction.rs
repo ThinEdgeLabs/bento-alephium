@@ -2,10 +2,10 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::api::error::AppError;
-use crate::api::handler::dto::{TransactionDto, TransactionHashQuery, TransactionsQuery};
+use crate::api::handler::dto::{TransactionBlockQuery, TransactionDto, TransactionHashQuery, TransactionsQuery};
 use crate::api::AppState;
 use crate::api::Pagination;
-use crate::repository::{get_tx_by_hash, get_txs};
+use crate::repository::{get_tx_by_hash, get_txs, get_txs_by_block};
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -16,6 +16,7 @@ impl TransactionApiModule {
         OpenApiRouter::new()
             .routes(routes!(get_txs_handler))
             .routes(routes!(get_tx_by_hash_handler))
+            .routes(routes!(get_tx_by_block_handler))
     }
 }
 
@@ -64,3 +65,25 @@ pub async fn get_tx_by_hash_handler(
     }
     Ok(Json(tx_model))
 }
+
+#[utoipa::path(
+    get,
+    path = "/block",
+    tag = "Transactions",
+    params(TransactionBlockQuery),
+    responses(
+        (status = 200, description = "Transaction retrieved successfully", body = TransactionDto),
+        (status = 404, description = "Transaction not found"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+pub async fn get_tx_by_block_handler(
+    Query(query): Query<TransactionBlockQuery>,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, AppError> {
+    let db = state.db;
+    let block_hash = query.block_hash.clone();
+    let tx_models = get_txs_by_block(db, &block_hash).await?;
+    Ok(Json(tx_models))
+}
+
