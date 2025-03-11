@@ -1,9 +1,5 @@
-use crate::{traits::{BlockProvider, TransactionProvider}, types::{
-    BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
-    BlocksPerTimestampRange, Transaction,
-}};
+use crate::{traits::TransactionProvider, types::Transaction};
 use anyhow::Result;
-use std::env;
 use url::Url;
 use async_trait::async_trait;
 
