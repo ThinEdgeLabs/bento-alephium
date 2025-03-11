@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 use diesel::{insert_into, query_dsl::methods::FilterDsl, SelectableHelper};

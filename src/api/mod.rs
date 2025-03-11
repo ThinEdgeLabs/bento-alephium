@@ -1,7 +1,7 @@
 use crate::db::DbPool;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::ToSchema;
 
 pub mod error;
 pub mod handler;

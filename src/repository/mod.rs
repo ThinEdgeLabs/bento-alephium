@@ -15,7 +15,7 @@ use crate::{
     types::BlockHash,
 };
 use anyhow::Ok;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use diesel::insert_into;
 use diesel::prelude::*;
 use diesel::ExpressionMethods;

@@ -4,15 +4,12 @@ use axum::Json;
 use crate::api::error::AppError;
 use crate::api::handler::dto::{BlockByHeightQuery, TransactionDto};
 use crate::api::handler::dto::{BlockDto, BlocksQuery};
-use crate::api::Pagination;
 use crate::repository::{get_block_by_hash, get_block_by_height, get_block_transactions};
 use crate::{api::AppState, repository::get_blocks};
 use axum::response::IntoResponse;
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use super::dto::{block, BlockByHashQuery};
+use super::dto::BlockByHashQuery;
 pub struct BlockApiModule;
 
 impl BlockApiModule {
