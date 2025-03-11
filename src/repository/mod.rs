@@ -9,6 +9,7 @@ pub use event::*;
 pub use transaction::*;
 
 use crate::{
+    api::error::RepositoryError,
     db::DbPool,
     models::{block::BlockModel, event::EventModel, transaction::TransactionModel},
     types::BlockHash,
@@ -133,6 +134,6 @@ pub async fn get_block_transactions(
             .await?;
         Ok(transaction_models)
     } else {
-        Err(anyhow!("Block not found"))
+        Err(RepositoryError::BlockNotFound(block_hash_value).into())
     }
 }

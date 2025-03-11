@@ -47,7 +47,7 @@ pub struct EventByContractQuery {
 #[derive(Debug, IntoParams, ToSchema, Serialize, Deserialize)]
 #[into_params(style = Form, parameter_in = Query)]
 pub struct EventByTxIdQuery {
-    /// The contract ID to filter events by
+    /// The transaction ID to filter events by
     pub tx_id: String,
 
     // Include the pagination fields

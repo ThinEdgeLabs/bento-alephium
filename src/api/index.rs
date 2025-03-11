@@ -22,7 +22,6 @@ pub async fn start(config: Config) -> Result<()> {
     api.info.description = Some("Bento Alephium Indexer REST API".to_string());
     let app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
-    
     let addr = config.api_endpoint();
     let listener = tokio::net::TcpListener::bind(addr).await?;
 

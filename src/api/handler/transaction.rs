@@ -54,6 +54,13 @@ pub async fn get_tx_by_hash_handler(
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db;
-    let tx_model = get_tx_by_hash(db, &query.hash).await?;
+    let hash = query.hash.clone();
+    let tx_model = get_tx_by_hash(db, &hash).await?;
+
+    if tx_model.is_none() {
+        return Err(AppError::NotFound(
+            format!("Transaction with tx id {hash} not found").to_string(),
+        ));
+    }
     Ok(Json(tx_model))
 }

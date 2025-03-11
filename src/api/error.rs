@@ -6,27 +6,29 @@ use axum::{
 use serde_json::json;
 use std::fmt;
 
+use crate::types::BlockHash;
+
 // Define custom error types
 #[derive(Debug)]
 pub enum AppError {
     // Internal server errors
     Internal(anyhow::Error),
-    
+
     // Database related errors
     DatabaseError(anyhow::Error),
-    
+
     // Validation errors
     ValidationError(String),
-    
+
     // Not found errors
     NotFound(String),
-    
+
     // Authentication errors
     Unauthorized(String),
-    
+
     // Authorization errors
     Forbidden(String),
-    
+
     // Bad request errors
     BadRequest(String),
 }
@@ -53,34 +55,21 @@ impl std::error::Error for AppError {}
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AppError::Internal(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Internal server error: {}", e),
-            ),
-            AppError::DatabaseError(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Database error occurred: {}", e),
-            ),
-            AppError::ValidationError(msg) => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                format!("Validation error: {}", msg),
-            ),
-            AppError::NotFound(msg) => (
-                StatusCode::NOT_FOUND,
-                format!("Not found: {}", msg),
-            ),
-            AppError::Unauthorized(msg) => (
-                StatusCode::UNAUTHORIZED,
-                format!("Unauthorized: {}", msg),
-            ),
-            AppError::Forbidden(msg) => (
-                StatusCode::FORBIDDEN,
-                format!("Forbidden: {}", msg),
-            ),
-            AppError::BadRequest(msg) => (
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", msg),
-            ),
+            AppError::Internal(e) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Internal server error: {}", e))
+            }
+            AppError::DatabaseError(e) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Database error occurred: {}", e))
+            }
+            AppError::ValidationError(msg) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, format!("Validation error: {}", msg))
+            }
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, format!("Not found: {}", msg)),
+            AppError::Unauthorized(msg) => {
+                (StatusCode::UNAUTHORIZED, format!("Unauthorized: {}", msg))
+            }
+            AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, format!("Forbidden: {}", msg)),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, format!("Bad request: {}", msg)),
         };
 
         // Create a JSON response with error details
@@ -96,10 +85,24 @@ impl IntoResponse for AppError {
     }
 }
 
-// Implement From traits for common error conversions
+// Implement the conversion from anyhow::Error to AppError
 impl From<anyhow::Error> for AppError {
-    fn from(err: anyhow::Error) -> Self {
-        AppError::Internal(err)
+    fn from(error: anyhow::Error) -> Self {
+        // categorize based on error message content
+
+        let error_msg = error.to_string();
+
+        if error_msg.contains("database") || error_msg.contains("SQL") {
+            AppError::DatabaseError(error.into())
+        } else if error_msg.contains("validation") {
+            AppError::ValidationError(error_msg)
+        } else if error_msg.contains("authentication") || error_msg.contains("unauthorized") {
+            AppError::Unauthorized(error_msg)
+        } else if error_msg.contains("not found") {
+            AppError::NotFound(error_msg)
+        } else {
+            AppError::Internal(error.into())
+        }
     }
 }
 
@@ -109,46 +112,26 @@ impl From<diesel::result::Error> for AppError {
     }
 }
 
-// Example usage in route handlers
-pub async fn example_handler() -> Result<Json<serde_json::Value>, AppError> {
-    // Example of validation error
-    if false {
-        return Err(AppError::ValidationError("Invalid input".to_string()));
+#[derive(Debug, thiserror::Error)]
+pub enum RepositoryError {
+    #[error("Block not found: {0}")]
+    BlockNotFound(BlockHash),
+
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] diesel::result::Error),
+
+    #[error("Other error: {0}")]
+    Other(#[from] anyhow::Error),
+}
+
+impl From<RepositoryError> for AppError {
+    fn from(err: RepositoryError) -> Self {
+        match err {
+            RepositoryError::BlockNotFound(hash) => {
+                AppError::NotFound(format!("Block not found: {}", hash))
+            }
+            RepositoryError::DatabaseError(e) => AppError::DatabaseError(e.into()),
+            RepositoryError::Other(e) => AppError::Internal(e),
+        }
     }
-
-    // Example of not found error
-    if false {
-        return Err(AppError::NotFound("Resource not found".to_string()));
-    }
-
-    // Example of successful response
-    Ok(Json(json!({
-        "success": true,
-        "data": "Operation completed successfully"
-    })))
-}
-
-// Helper function to create validation errors
-pub fn validation_err(msg: impl Into<String>) -> AppError {
-    AppError::ValidationError(msg.into())
-}
-
-// Helper function to create not found errors
-pub fn not_found_err(msg: impl Into<String>) -> AppError {
-    AppError::NotFound(msg.into())
-}
-
-// Helper function to create unauthorized errors
-pub fn unauthorized_err(msg: impl Into<String>) -> AppError {
-    AppError::Unauthorized(msg.into())
-}
-
-// Helper function to create forbidden errors
-pub fn forbidden_err(msg: impl Into<String>) -> AppError {
-    AppError::Forbidden(msg.into())
-}
-
-// Helper function to create bad request errors
-pub fn bad_request_err(msg: impl Into<String>) -> AppError {
-    AppError::BadRequest(msg.into())
 }
