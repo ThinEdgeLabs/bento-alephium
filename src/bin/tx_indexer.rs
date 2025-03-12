@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let processor_config = ProcessorConfig::TxProcessor;
 
-    let mut worker = Worker::new(
+    let worker = Worker::new(
         vec![processor_config],
         database_url,
         Network::Testnet,

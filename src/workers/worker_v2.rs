@@ -6,9 +6,9 @@ use diesel::{insert_into, ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;
 
 use crate::{
-    client::{Client, Network}, config::ProcessorConfig, db::{new_db_pool, DbPool}, models::{block::BlockModel, convert_bwe_to_block_models}, processors::{
+    client::{Client, Network}, config::ProcessorConfig, db::{new_db_pool, DbPool}, processors::{
         block_processor::BlockProcessor, default_processor::DefaultProcessor, event_processor::EventProcessor, lending_marketplace_processor::{insert_loan_actions_to_db, insert_loan_details_to_db, LendingContractProcessor}, tx_processor::TxProcessor, Processor, ProcessorOutput, ProcessorTrait
-    }, repository::{get_block_by_hash, insert_blocks_to_db, insert_events_to_db, insert_txs_to_db, update_main_chain}, schema::processor_status, traits::BlockProvider, types::{BlockAndEvents, REORG_TIMEOUT}
+    }, repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db}, schema::processor_status, traits::BlockProvider, types::BlockAndEvents
 };
 
 // Message types for different stages

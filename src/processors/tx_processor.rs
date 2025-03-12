@@ -4,7 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{config::ProcessorConfig, db::DbPool, models::{convert_bwe_to_tx_models, transaction::TransactionModel}, repository::insert_txs_to_db, types::BlockAndEvents};
+use crate::{config::ProcessorConfig, db::DbPool, models::{convert_bwe_to_tx_models, transaction::TransactionModel}, types::BlockAndEvents};
 
 use super::{ProcessorOutput, ProcessorTrait};
 

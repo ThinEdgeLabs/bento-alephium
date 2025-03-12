@@ -12,7 +12,6 @@ use crate::{
 };
 
 use super::{ProcessorOutput, ProcessorTrait};
-use crate::repository::insert_blocks_to_db;
 
 pub struct BlockProcessor {
     connection_pool: Arc<DbPool>,

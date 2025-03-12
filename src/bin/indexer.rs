@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let processor_config = ProcessorConfig::EventProcessor;
 
-    let mut worker = Worker::new(
+    let worker = Worker::new(
         vec![processor_config],
         database_url,
         Network::Testnet,

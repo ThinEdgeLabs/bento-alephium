@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let mut worker = Worker::new(
+    let worker = Worker::new(
         vec![ProcessorConfig::BlockProcessor],
         database_url,
         Network::Testnet,
