@@ -2,18 +2,14 @@ use anyhow::{Context, Result};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::{mpsc}, time::sleep};
 use futures::stream::{StreamExt, FuturesUnordered};
-use anyhow::{Context, Result};
 use diesel::{insert_into, ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;
-use std::{sync::Arc, time::Duration};
-use tokio::time::sleep;
 
 use crate::{
     client::{Client, Network}, config::ProcessorConfig, db::{new_db_pool, DbPool}, models::{block::BlockModel, convert_bwe_to_block_models}, processors::{
-        block_processor::BlockProcessor, default_processor::DefaultProcessor, event_processor::EventProcessor, lending_marketplace_processor::LendingContractProcessor, tx_processor::TxProcessor, Processor, ProcessorTrait
-    }, repository::{get_block_by_hash, insert_blocks_to_db, update_main_chain}, schema::processor_status, traits::BlockProvider, types::REORG_TIMEOUT
+        block_processor::BlockProcessor, default_processor::DefaultProcessor, event_processor::EventProcessor, lending_marketplace_processor::{insert_loan_actions_to_db, insert_loan_details_to_db, LendingContractProcessor}, tx_processor::TxProcessor, Processor, ProcessorOutput, ProcessorTrait
+    }, repository::{get_block_by_hash, insert_blocks_to_db, insert_events_to_db, insert_txs_to_db, update_main_chain}, schema::processor_status, traits::BlockProvider, types::{BlockAndEvents, REORG_TIMEOUT}
 };
-use crate::{client::{Client, Network}, config::ProcessorConfig, db::{new_db_pool, DbPool}, models::{block::BlockModel, convert_bwe_to_block_models}, processors::{Processor, ProcessorOutput, ProcessorTrait}, repository::{get_block_by_hash, insert_blocks_to_db, update_main_chain}, traits::BlockProvider, types::{BlockAndEvents, REORG_TIMEOUT}, worker::{build_processor, get_last_timestamp, update_last_timestamp, SyncOptions}};
 
 // Message types for different stages
 #[derive(Clone)]
@@ -165,20 +161,33 @@ pub struct StorageStage {
 impl StageHandler for StorageStage {
     async fn handle(&self, input: StageMessage) -> Result<StageMessage> {
         match input {
-            StageMessage::Processed(blocks) => {
-                for block in blocks {
-                    insert_blocks_to_db(self.db_pool.clone(), vec![block.clone()]).await?;
-                    
-                    if chrono::Utc::now().timestamp_millis() - block.timestamp <= REORG_TIMEOUT {
-                        update_main_chain(
-                            self.db_pool.clone(),
-                            block.hash,
-                            block.chain_from,
-                            block.chain_to,
-                            None,
-                        ).await?;
+            StageMessage::Processed(output) => {
+
+                match output {
+                    ProcessorOutput::Block(blocks) => {
+                        insert_blocks_to_db(self.db_pool.clone(), blocks).await?;
                     }
+                    ProcessorOutput::Event(events) => {
+                        insert_events_to_db(self.db_pool.clone(), events).await?;
+                    }
+                    ProcessorOutput::LendingContract((loan_actions, loan_details)) => {
+                        insert_loan_actions_to_db(self.db_pool.clone(), loan_actions).await?;
+                        insert_loan_details_to_db(self.db_pool.clone(), loan_details).await?;
+                    }
+                    ProcessorOutput::Tx(txs) => {
+                        insert_txs_to_db(self.db_pool.clone(), txs).await?;
+                    }
+                    _ => unimplemented!(),
                 }
+                // if chrono::Utc::now().timestamp_millis() - block.timestamp <= REORG_TIMEOUT {
+                //     update_main_chain(
+                //         self.db_pool.clone(),
+                //         block.hash,
+                //         block.chain_from,
+                //         block.chain_to,
+                //         None,
+                //     ).await?;
+                // }
                 Ok(StageMessage::Complete)
             }
             _ => Ok(StageMessage::Complete),
@@ -296,53 +305,76 @@ impl Worker {
             fetch_strategy: fetch_strategy.unwrap_or(FetchStrategy::Simple),
         })
     }
-
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
-
-        for processor_config in self.processor_configs.iter() {
-            let processor = build_processor(processor_config, self.db_pool.clone());
-            let processor_name = processor.name();
+        let mut handles = Vec::new();
+    
+        for processor_config in self.processor_configs.clone() {
+            let pool_clone = self.db_pool.clone();
+            let client_clone = self.client.clone();
+            let fetch_strategy_clone = self.fetch_strategy.clone();
+            let sync_opts_clone = self.sync_opts.clone();
+            let processor_config = processor_config.clone();
             
-            let pipeline = Pipeline::new(
-                self.client.clone(),
-                self.db_pool.clone(),
-                processor,
-                self.fetch_strategy.clone(),
-            );
-
-            let last_ts = get_last_timestamp(&self.db_pool, processor_name).await?;
-            let mut current_ts = self.sync_opts.start_ts.unwrap_or(0).max(last_ts);
-            let step = self.sync_opts.step.unwrap_or(1000);
-            let sync_duration = Duration::from_secs(
-                self.sync_opts.sync_duration.unwrap_or(1) as u64
-            );
-
-            loop {
-                let to_ts = current_ts + step;
-                let range = BlockRange {
-                    from_ts: current_ts,
-                    to_ts,
-                };
-
-                if let Err(err) = pipeline.run(range).await {
-                    tracing::error!(
-                        processor_name = processor_name,
-                        error = ?err,
-                        "Pipeline execution failed, retrying in {:?}",
-                        sync_duration
-                    );
-                } else {
-                    update_last_timestamp(&self.db_pool, processor_name, to_ts).await?;
-                    current_ts = to_ts + 1;
+            // Specify the error type explicitly with ::<(), anyhow::Error>
+            let handle = tokio::spawn(async move {
+                let processor = build_processor(&processor_config, pool_clone.clone());
+                let processor_name = processor.name();
+                
+                let pipeline = Pipeline::new(
+                    client_clone,
+                    pool_clone.clone(),
+                    processor,
+                    fetch_strategy_clone,
+                );
+    
+                let last_ts = get_last_timestamp(&pool_clone, processor_name).await?;
+                let mut current_ts = sync_opts_clone.start_ts.unwrap_or(0).max(last_ts);
+                let step = sync_opts_clone.step.unwrap_or(1000);
+                let sync_duration = Duration::from_secs(
+                    sync_opts_clone.sync_duration.unwrap_or(1) as u64
+                );
+    
+                loop {
+                    let to_ts = current_ts + step;
+                    let range = BlockRange {
+                        from_ts: current_ts,
+                        to_ts,
+                    };
+    
+                    if let Err(err) = pipeline.run(range).await {
+                        tracing::error!(
+                            processor_name = processor_name,
+                            error = ?err,
+                            "Pipeline execution failed, retrying in {:?}",
+                            sync_duration
+                        );
+                    } else {
+                        update_last_timestamp(&pool_clone, processor_name, to_ts).await?;
+                        current_ts = to_ts + 1;
+                    }
+    
+                    sleep(sync_duration).await;
                 }
-
-                sleep(sync_duration).await;
+                
+                #[allow(unreachable_code)]
+                Ok::<(), anyhow::Error>(())
+            });
+    
+            handles.push(handle);
+        }
+    
+        // Wait for all tasks to complete (they won't due to infinite loops)
+        for handle in handles {
+            match handle.await {
+                Ok(result) => result?,
+                Err(e) => return Err(anyhow::anyhow!("Task panicked: {}", e)),
             }
         }
         
         Ok(())
     }
+    
 
         // For the normal processor build we just use standard Diesel with the postgres
     // feature enabled (which uses libpq under the hood, hence why we named the feature
@@ -416,7 +448,7 @@ pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> Proces
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct SyncOptions {
     pub start_ts: Option<i64>,
     pub step: Option<i64>,

@@ -71,7 +71,7 @@ impl Debug for LendingContractProcessor {
 
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
-    type Output = Vec<LoanActionModel>;
+    type Output = (Vec<LoanActionModel>, Vec<LoanDetailModel>);
 
     fn name(&self) -> &'static str {
         ProcessorConfig::LendingContractProcessor("".into()).name()
@@ -95,7 +95,7 @@ impl ProcessorTrait for LendingContractProcessor {
         // if !loan_details.is_empty() {
         //     insert_loan_details_to_db(self.connection_pool.clone(), loan_details).await?;
         // }
-        Ok(loan_actions)
+        Ok(loan_actions.into_iter().zip(loan_details.into_iter()).collect())
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {

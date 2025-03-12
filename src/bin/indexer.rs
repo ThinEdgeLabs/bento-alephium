@@ -1,7 +1,8 @@
+use std::vec;
+
 use bento_alephium::{
     client::Network,
-    config::ProcessorConfig,
-    worker::{SyncOptions, Worker},
+    config::ProcessorConfig, workers::worker_v2::{SyncOptions, Worker},
 };
 
 #[tokio::main]
@@ -20,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processor_config = ProcessorConfig::EventProcessor;
 
     let mut worker = Worker::new(
-        processor_config,
+        vec![processor_config],
         database_url,
         Network::Testnet,
         None,
@@ -30,6 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             back_step: None,
             sync_duration: None,
         }),
+        None
     )
     .await?;
 
