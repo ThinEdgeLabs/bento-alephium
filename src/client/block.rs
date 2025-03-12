@@ -42,7 +42,7 @@ impl BlockProvider for  Client {
 
     // Get a block with hash.
     // GET:/blockflow/blocks/{block_hash}
-    async fn get_block(&self, block_hash: &String) -> Result<BlockEntry> {
+    async fn get_block(&self, block_hash: &str) -> Result<BlockEntry> {
         let endpoint = format!("blockflow/blocks/{}", block_hash);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
         let response = self.inner.get(url).send().await?.json().await?;
@@ -60,7 +60,7 @@ impl BlockProvider for  Client {
     /// A `Result` containing a `BlockAndEvents` structure, or an error if the request fails.
     async fn get_block_and_events_by_hash(
         &self,
-        block_hash: &String,
+        block_hash: &str,
     ) -> Result<BlockAndEvents> {
         let endpoint = format!("blockflow/blocks-with-events/{}", block_hash);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
@@ -70,7 +70,7 @@ impl BlockProvider for  Client {
 
     // Get block header.
     // GET:/blockflow/headers/{block_hash}
-    async fn get_block_header(&self, block_hash: &String) -> Result<BlockHeaderEntry> {
+    async fn get_block_header(&self, block_hash: &str) -> Result<BlockHeaderEntry> {
         let endpoint = format!("blockflow/headers/{}", block_hash);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
         let response = self.inner.get(url).send().await?.json().await?;
