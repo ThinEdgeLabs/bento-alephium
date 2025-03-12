@@ -37,8 +37,7 @@ pub fn convert_bwe_to_block_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Bloc
 
 pub fn convert_bwe_to_event_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<EventModel> {
     let mut models = Vec::new();
-    let mut transactions =  blocks.iter().flatten().flat_map(|bwe| bwe.block.transactions.clone()).collect::<Vec<_>>();
-
+    
     for bes in blocks {
         for be in bes {
             for e in be.events {
@@ -74,6 +73,3 @@ pub fn convert_bwe_to_tx_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Transac
 
 
 }
-
-
-// pub fn convert_bwe_

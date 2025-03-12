@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use diesel::insert_into;
-use serde_json::error;
 
 use crate::{db::DbPool, models::transaction::TransactionModel};
 use anyhow::Result;

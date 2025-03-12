@@ -15,15 +15,15 @@ pub trait BlockProvider {
     ) -> Result<BlocksAndEventsPerTimestampRange>;
 
     // Get a block with hash.
-    async fn get_block(&self, block_hash: &String) -> Result<BlockEntry>;
+    async fn get_block(&self, block_hash: &str) -> Result<BlockEntry>;
 
     // Get a block with events by its hash.
     async fn get_block_and_events_by_hash(
         &self,
-        block_hash: &String,
+        block_hash: &str,
     ) -> Result<BlockAndEvents>;
 
-    async fn get_block_header(&self, block_hash: &String) -> Result<BlockHeaderEntry>;
+    async fn get_block_header(&self, block_hash: &str) -> Result<BlockHeaderEntry>;
 }
 
 #[async_trait]

@@ -1,6 +1,5 @@
 use crate::models::BlockModel;
 use crate::{schema::transactions, types::BlockHash};
-use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 #[derive(
