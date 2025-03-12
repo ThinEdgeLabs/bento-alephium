@@ -82,7 +82,7 @@ impl ProcessorTrait for LendingContractProcessor {
         &self,
         _from: i64,
         _to: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
+        blocks: Vec<BlockAndEvents>,
     ) -> Result<()> {
         // Sanity check
         if !self.config.is_lending_contract_processor() {
@@ -122,7 +122,7 @@ pub async fn insert_loan_details_to_db(
 }
 
 pub fn convert_to_model(
-    blocks: Vec<Vec<BlockAndEvents>>,
+    blocks: Vec<BlockAndEvents>,
     contract_address: &str,
 ) -> (Vec<LoanActionModel>, Vec<LoanDetailModel>) {
     let mut loan_actions = Vec::new();

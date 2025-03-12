@@ -9,10 +9,9 @@ use block::BlockModel;
 use event::EventModel;
 use transaction::TransactionModel;
 
-pub fn convert_bwe_to_block_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<BlockModel> {
+pub fn convert_bwe_to_block_models(blocks: Vec<BlockAndEvents>) -> Vec<BlockModel> {
     let mut models = Vec::new();
-    for bes in blocks {
-        for be in bes {
+    for be in blocks {
             let b = be.block;
             models.push(BlockModel {
                 hash: b.hash,
@@ -30,16 +29,14 @@ pub fn convert_bwe_to_block_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Bloc
                 main_chain: b.main_chain.unwrap_or(false),
                 ghost_uncles: serde_json::to_value(b.ghost_uncles).unwrap_or_default(),
             });
-        }
     }
     models
 }
 
-pub fn convert_bwe_to_event_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<EventModel> {
+pub fn convert_bwe_to_event_models(blocks: Vec<BlockAndEvents>) -> Vec<EventModel> {
     let mut models = Vec::new();
-    
-    for bes in blocks {
-        for be in bes {
+
+        for be in blocks {
             for e in be.events {
                 models.push(EventModel {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -50,12 +47,11 @@ pub fn convert_bwe_to_event_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<Even
                 });
             }
         }
-    }
     models
 }
 
-pub fn convert_bwe_to_tx_models(blocks: Vec<Vec<BlockAndEvents>>) -> Vec<TransactionModel> {
-    let mut iterator =  blocks.iter().flatten().map(|bwe| (bwe.block.hash.clone(), bwe.block.transactions.clone())).collect::<Vec<_>>();
+pub fn convert_bwe_to_tx_models(blocks: Vec<BlockAndEvents>) -> Vec<TransactionModel> {
+    let mut iterator =  blocks.iter().map(|bwe| (bwe.block.hash.clone(), bwe.block.transactions.clone())).collect::<Vec<_>>();
     
     iterator.iter_mut().flat_map(|(block, transactions)| {
         transactions.dedup_by(|a, b| a.unsigned.tx_id != b.unsigned.tx_id);

@@ -11,3 +11,4 @@ pub mod utils;
 pub mod worker;
 pub mod ws;
 pub mod traits;
+pub mod workers;

@@ -11,7 +11,7 @@ use crate::{
     config::ProcessorConfig, db::DbPool, models::block::BlockModel, types::BlockAndEvents,
 };
 
-use super::ProcessorTrait;
+use super::{ProcessorOutput, ProcessorTrait};
 use crate::repository::insert_blocks_to_db;
 
 pub struct BlockProcessor {
@@ -37,6 +37,8 @@ impl Debug for BlockProcessor {
 
 #[async_trait]
 impl ProcessorTrait for BlockProcessor {
+    type Output = Vec<BlockModel>;
+
     fn name(&self) -> &'static str {
         ProcessorConfig::BlockProcessor.name()
     }
@@ -49,15 +51,21 @@ impl ProcessorTrait for BlockProcessor {
         &self,
         _from: i64,
         _to: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
-    ) -> Result<()> {
+        blocks: Vec<BlockAndEvents>,
+    ) -> Result<Self::Output> {
         // Process blocks and insert to db
         let models = convert_bwe_to_block_models(blocks);
-        if !models.is_empty() {
-            insert_blocks_to_db(self.connection_pool.clone(), models).await?;
-        }
+        // if !models.is_empty() {
+        //     insert_blocks_to_db(self.connection_pool.clone(), models).await?;
+        // }
+
+        Ok(models)
         // handle reorgs
-        Ok(())
+        // Ok(())
+    }
+
+    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
+        ProcessorOutput::Block(output)
     }
 }
 

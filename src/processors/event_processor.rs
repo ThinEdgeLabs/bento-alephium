@@ -5,11 +5,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::{
-    config::ProcessorConfig, db::DbPool, models::convert_bwe_to_event_models,
+    config::ProcessorConfig, db::DbPool, models::{convert_bwe_to_event_models, event::EventModel},
     repository::insert_events_to_db, types::BlockAndEvents,
 };
 
-use super::ProcessorTrait;
+use super::{ProcessorOutput, ProcessorTrait};
 
 pub struct EventProcessor {
     connection_pool: Arc<DbPool>,
@@ -34,6 +34,8 @@ impl Debug for EventProcessor {
 
 #[async_trait]
 impl ProcessorTrait for EventProcessor {
+    type Output = Vec<EventModel>;
+
     fn name(&self) -> &'static str {
         ProcessorConfig::EventProcessor.name()
     }
@@ -46,18 +48,21 @@ impl ProcessorTrait for EventProcessor {
         &self,
         _from: i64,
         _to: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
-    ) -> Result<()> {
+        blocks: Vec<BlockAndEvents>,
+    ) -> Result<Self::Output> {
         // Process events and insert to db
         let models = convert_bwe_to_event_models(blocks);
         if !models.is_empty() {
             tracing::info!(
                 processor_name = ?self.name(),
                 count = ?models.len(),
-                "Found models to insert"
+                "Processed events"
             );
-            insert_events_to_db(self.connection_pool.clone(), models).await?;
         }
-        Ok(())
+        Ok(models)
+    }
+
+    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
+        ProcessorOutput::Event(output)
     }
 }
