@@ -19,7 +19,7 @@ pub enum FetchStrategy {
     Parallel { num_workers: usize },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct BlockRange {
     from_ts: i64,
     to_ts: i64,
@@ -54,6 +54,14 @@ pub struct FetcherStage {
 impl FetcherStage {
     pub fn new(client: Arc<Client>, strategy: FetchStrategy) -> Self {
         Self { client, strategy }
+    }
+
+    fn chunk_size(&self) -> i64 {
+        match &self.strategy {
+            FetchStrategy::Simple => 1000, 
+            FetchStrategy::Chunked { chunk_size } => *chunk_size,
+            FetchStrategy::Parallel { num_workers } => 1000 / *num_workers as i64,
+        }
     }
 
     async fn fetch_chunk(&self, range: BlockRange) -> Result<BlockBatch> {
@@ -115,14 +123,23 @@ impl StageHandler for FetcherStage {
                             batches.push(batch);
                         }
                         
-                        Ok(StageMessage::Batch(batches.remove(0))) // Send first batch
+                        if batches.is_empty() {
+                            Ok(StageMessage::Complete)
+                        } else {
+                            Ok(StageMessage::Batch(batches.remove(0))) // Send first batch
+                        }
                     }
                     FetchStrategy::Parallel { num_workers } => {
                         let mut batches = self.fetch_parallel(range, *num_workers).await?;
-                        Ok(StageMessage::Batch(batches.remove(0))) // Send first batch
+                        if batches.is_empty() {
+                            Ok(StageMessage::Complete)
+                        } else {
+                            Ok(StageMessage::Batch(batches.remove(0))) // Send first batch
+                        }
                     }
                 }
             }
+            StageMessage::Complete => Ok(StageMessage::Complete),
             _ => Ok(StageMessage::Complete),
         }
     }
@@ -130,7 +147,6 @@ impl StageHandler for FetcherStage {
 
 pub struct ProcessorStage {
     processor: Processor,
-    db_pool: Arc<DbPool>,
 }
 
 #[async_trait::async_trait]
@@ -162,33 +178,65 @@ impl StageHandler for StorageStage {
     async fn handle(&self, input: StageMessage) -> Result<StageMessage> {
         match input {
             StageMessage::Processed(output) => {
-
-                match output {
+                let result = match output {
                     ProcessorOutput::Block(blocks) => {
-                        insert_blocks_to_db(self.db_pool.clone(), blocks).await?;
+                        match insert_blocks_to_db(self.db_pool.clone(), blocks).await {
+                            Ok(_) => {
+                                tracing::info!("Successfully stored blocks");
+                                Ok(())
+                            },
+                            Err(e) => {
+                                tracing::error!("Failed to store blocks: {}", e);
+                                Err(e)
+                            }
+                        }
                     }
                     ProcessorOutput::Event(events) => {
-                        insert_events_to_db(self.db_pool.clone(), events).await?;
+                        match insert_events_to_db(self.db_pool.clone(), events).await {
+                            Ok(_) => {
+                                tracing::info!("Successfully stored events");
+                                Ok(())
+                            },
+                            Err(e) => {
+                                tracing::error!("Failed to store events: {}", e);
+                                Err(e)
+                            }
+                        }
                     }
                     ProcessorOutput::LendingContract((loan_actions, loan_details)) => {
-                        insert_loan_actions_to_db(self.db_pool.clone(), loan_actions).await?;
-                        insert_loan_details_to_db(self.db_pool.clone(), loan_details).await?;
+                        match (
+                            insert_loan_actions_to_db(self.db_pool.clone(), loan_actions).await,
+                            insert_loan_details_to_db(self.db_pool.clone(), loan_details).await
+                        ) {
+                            (Ok(_), Ok(_)) => {
+                                tracing::info!("Successfully stored lending contract data");
+                                Ok(())
+                            },
+                            (Err(e), _) | (_, Err(e)) => {
+                                tracing::error!("Failed to store lending contract data: {}", e);
+                                Err(e)
+                            }
+                        }
                     }
                     ProcessorOutput::Tx(txs) => {
-                        insert_txs_to_db(self.db_pool.clone(), txs).await?;
+                        match insert_txs_to_db(self.db_pool.clone(), txs).await {
+                            Ok(_) => {
+                                tracing::info!("Successfully stored transactions");
+                                Ok(())
+                            },
+                            Err(e) => {
+                                tracing::error!("Failed to store transactions: {}", e);
+                                Err(e)
+                            }
+                        }
                     }
-                    _ => unimplemented!(),
+                    ProcessorOutput::Default(()) => Ok(()),
+                };
+
+                match result {
+                    Ok(_) => Ok(StageMessage::Complete),
+                    Err(e) => Err(e)
                 }
-                // if chrono::Utc::now().timestamp_millis() - block.timestamp <= REORG_TIMEOUT {
-                //     update_main_chain(
-                //         self.db_pool.clone(),
-                //         block.hash,
-                //         block.chain_from,
-                //         block.chain_to,
-                //         None,
-                //     ).await?;
-                // }
-                Ok(StageMessage::Complete)
             }
             _ => Ok(StageMessage::Complete),
         }
@@ -213,13 +261,12 @@ impl Pipeline {
             fetcher: Arc::new(FetcherStage::new(client, fetch_strategy)),
             processor: Arc::new(ProcessorStage {
                 processor,
-                db_pool: db_pool.clone(),
             }),
             storage: Arc::new(StorageStage { db_pool }),
         }
     }
 
-    pub async fn run(&self, range: BlockRange) -> Result<()> {
+    pub async fn run(&self, initial_range: BlockRange) -> Result<()> {
         let (fetch_tx, fetch_rx) = mpsc::channel(100);
         let (process_tx, process_rx) = mpsc::channel(100);
         let (storage_tx, storage_rx) = mpsc::channel(100);
@@ -231,12 +278,24 @@ impl Pipeline {
 
         let fetch_handle = tokio::spawn(async move {
             let mut rx = fetch_rx;
-            while let Some(msg) = rx.recv().await {
+            let mut current_range = initial_range.clone();
+            
+            loop {
+                let msg = StageMessage::Range(current_range.clone());
                 let result = fetcher.handle(msg).await?;
-                if let StageMessage::Complete = result {
-                    break;
+                
+                match result {
+                    StageMessage::Batch(batch) => {
+                        process_tx.send(StageMessage::Batch(batch)).await?;
+                        // Update range for next iteration
+                        current_range.from_ts = current_range.to_ts + 1;
+                        current_range.to_ts += fetcher.chunk_size();
+                    }
+                    StageMessage::Complete => {
+                        break;
+                    }
+                    _ => continue,
                 }
-                process_tx.send(result).await?;
             }
             Ok::<_, anyhow::Error>(())
         });
@@ -265,7 +324,7 @@ impl Pipeline {
         });
 
         // Start the pipeline
-        fetch_tx.send(StageMessage::Range(range)).await?;
+        fetch_tx.send(StageMessage::Range(initial_range.clone())).await?;
 
         // Wait for all stages to complete
         tokio::try_join!(fetch_handle, process_handle, storage_handle)?;
@@ -316,7 +375,6 @@ impl Worker {
             let sync_opts_clone = self.sync_opts.clone();
             let processor_config = processor_config.clone();
             
-            // Specify the error type explicitly with ::<(), anyhow::Error>
             let handle = tokio::spawn(async move {
                 let processor = build_processor(&processor_config, pool_clone.clone());
                 let processor_name = processor.name();
@@ -364,7 +422,7 @@ impl Worker {
             handles.push(handle);
         }
     
-        // Wait for all tasks to complete (they won't due to infinite loops)
+        // Start all handlers by infinite loop.
         for handle in handles {
             match handle.await {
                 Ok(result) => result?,

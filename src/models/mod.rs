@@ -63,7 +63,7 @@ pub fn convert_bwe_to_tx_models(blocks: Vec<BlockAndEvents>) -> Vec<TransactionM
             generated_outputs: serde_json::to_value(t.generated_outputs.clone()).unwrap_or_default(),
             input_signatures: t.input_signatures.iter().map(|i| Option::Some(i.to_owned())).collect::<Vec<_>>(),
             script_signatures: t.script_signatures.iter().map(|i| Option::Some(i.to_owned())).collect::<Vec<_>>(),
-            block_hash: block.to_string(),
+            block_hash: Some(block.to_string()),
         })
     }).collect::<Vec<_>>()
 

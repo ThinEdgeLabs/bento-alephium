@@ -21,13 +21,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let processor_config = ProcessorConfig::EventProcessor;
 
     let worker = Worker::new(
-        vec![processor_config],
+        vec![ProcessorConfig::TxProcessor, ProcessorConfig::BlockProcessor],
         database_url,
         Network::Testnet,
         None,
         Some(SyncOptions {
             start_ts: Some(1716560632750),
-            step: Some(1000),
+            step: Some(1800000),
             back_step: None,
             sync_duration: None,
         }),
@@ -35,6 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    worker.run().await;
+    let _  = worker.run().await;
     Ok(())
 }
