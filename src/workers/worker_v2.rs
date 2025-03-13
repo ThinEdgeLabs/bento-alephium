@@ -16,7 +16,7 @@ use crate::{
 pub enum FetchStrategy {
     Simple,
     Chunked { chunk_size: i64 },
-    Parallel { num_workers: usize },
+    Parallel { total_time: i64, num_workers: usize },
 }
 
 #[derive(Clone, Copy)]
@@ -60,20 +60,26 @@ impl FetcherStage {
         match &self.strategy {
             FetchStrategy::Simple => 1000, 
             FetchStrategy::Chunked { chunk_size } => *chunk_size,
-            FetchStrategy::Parallel { num_workers } => 1000 / *num_workers as i64,
+            FetchStrategy::Parallel { total_time,num_workers } => *total_time,
         }
     }
 
     async fn fetch_chunk(&self, range: BlockRange) -> Result<BlockBatch> {
-        let blocks = self.client
+        let blocks: Vec<BlockAndEvents> = self.client
             .get_blocks_and_events(range.from_ts, range.to_ts)
             .await?
             .blocks_and_events.iter().flatten().cloned().collect();
         
+        tracing::info!(
+            "Fetched {} blocks from timestamp {} to timestamp {}",
+            blocks.clone().len(),
+            range.from_ts,
+            range.to_ts
+        );
         Ok(BlockBatch { blocks, range })
     }
 
-    async fn fetch_parallel(&self, range: BlockRange, num_workers: usize) -> Result<Vec<BlockBatch>> {
+    async fn fetch_parallel(&self, range: BlockRange,  num_workers: usize) -> Result<Vec<BlockBatch>> {
         let total_time = range.to_ts - range.from_ts;
         let chunk_size = total_time / num_workers as i64;
         
@@ -129,7 +135,7 @@ impl StageHandler for FetcherStage {
                             Ok(StageMessage::Batch(batches.remove(0))) // Send first batch
                         }
                     }
-                    FetchStrategy::Parallel { num_workers } => {
+                    FetchStrategy::Parallel { total_time: _, num_workers } => {
                         let mut batches = self.fetch_parallel(range, *num_workers).await?;
                         if batches.is_empty() {
                             Ok(StageMessage::Complete)
