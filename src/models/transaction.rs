@@ -26,5 +26,5 @@ pub struct TransactionModel {
     pub generated_outputs: serde_json::Value,
     pub input_signatures: Vec<Option<String>>,
     pub script_signatures: Vec<Option<String>>,
-    pub block_hash: BlockHash,
+    pub block_hash: Option<BlockHash>,
 }

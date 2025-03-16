@@ -4,9 +4,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{config::ProcessorConfig, db::DbPool, models::convert_bwe_to_tx_models, repository::insert_txs_to_db, types::BlockAndEvents};
+use crate::{config::ProcessorConfig, db::DbPool, models::{convert_bwe_to_tx_models, transaction::TransactionModel}, types::BlockAndEvents};
 
-use super::ProcessorTrait;
+use super::{ProcessorOutput, ProcessorTrait};
 
 pub struct TxProcessor {
     connection_pool: Arc<DbPool>,
@@ -31,6 +31,8 @@ impl Debug for TxProcessor {
 
 #[async_trait]
 impl ProcessorTrait for TxProcessor {
+    type Output = Vec<TransactionModel>;
+
     fn name(&self) -> &'static str {
         ProcessorConfig::TxProcessor.name()
     }
@@ -43,20 +45,24 @@ impl ProcessorTrait for TxProcessor {
         &self,
         _from: i64,
         _to: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
-    ) -> Result<()> {
+        blocks: Vec<BlockAndEvents>,
+    ) -> Result<Self::Output> {
         let models = convert_bwe_to_tx_models(blocks);
         // 
 
-        if !models.is_empty() {
-            tracing::info!(
-                processor_name = ?self.name(),
-                count = ?models.len(),
-                "Found models to insert"
-            );
-            insert_txs_to_db(self.connection_pool.clone(), models).await?;
-        }
-        Ok(())
+        // if !models.is_empty() {
+        //     tracing::info!(
+        //         processor_name = ?self.name(),
+        //         count = ?models.len(),
+        //         "Found models to insert"
+        //     );
+        //     insert_txs_to_db(self.connection_pool.clone(), models).await?;
+        // }
+        Ok(models)
         
+    }
+
+    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
+        ProcessorOutput::Tx(output)
     }
 }

@@ -14,13 +14,16 @@ use diesel_async::RunQueryDsl;
 /// Insert blocks into the database.
 #[allow(clippy::get_first)]
 pub async fn insert_blocks_to_db(db: Arc<DbPool>, block_models: Vec<BlockModel>) -> Result<()> {
+    if block_models.is_empty(){
+        return Ok(());
+    }
     let mut conn = db.get().await?;
-    insert_into(crate::schema::blocks::table).values(&block_models).execute(&mut conn).await?;
+    insert_into(crate::schema::blocks::table).values(&block_models).on_conflict(crate::schema::blocks::hash).do_nothing().execute(&mut conn).await?;
     tracing::info!(
-        "Inserted {} blocks from {} to {}",
+        "Inserted {} blocks from timestamp {} to timestamp {}",
         block_models.len(),
-        block_models.get(0).unwrap().height,
-        block_models.last().unwrap().height
+        block_models.get(0).unwrap().timestamp,
+        block_models.last().unwrap().timestamp,
     );
     Ok(())
 }

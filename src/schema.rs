@@ -74,11 +74,9 @@ diesel::table! {
         created_at -> Nullable<Timestamptz>,
         updated_at -> Nullable<Timestamptz>,
         main_chain -> Bool,
-        block_hash -> Text,
+        block_hash -> Nullable<Text>,
     }
 }
-
-diesel::joinable!(transactions -> blocks (block_hash));
 
 diesel::allow_tables_to_appear_in_same_query!(
     blocks,

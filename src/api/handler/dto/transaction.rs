@@ -25,7 +25,7 @@ impl From<TransactionModel> for TransactionDto {
             generated_outputs: model.generated_outputs,
             input_signatures: model.input_signatures,
             script_signatures: model.script_signatures,
-            block_hash: model.block_hash.to_string(),
+            block_hash: model.block_hash.unwrap_or_default(),
         }
     }
 }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 
 use crate::db::{new_db_pool, DbPool};
+#[derive(Debug, Clone)]
 pub enum ProcessorConfig {
     DefaultProcessor,
     BlockProcessor,

@@ -73,7 +73,7 @@ impl ProcessorTrait for CustomProcessor {
         &self,
         from_ts: i64,
         to_ts: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
+        blocks: Vec<BlockAndEvents>,
     ) -> Result<()> {
         // Implement your block processing logic here
         self.process_block_data(blocks).await
@@ -178,7 +178,7 @@ impl ProcessorTrait for Processor {
         &self,
         from_ts: i64,
         to_ts: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
+        blocks: Vec<BlockAndEvents>,
     ) -> Result<()> {
         match self {
             // Existing matches...
