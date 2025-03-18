@@ -1,6 +1,6 @@
 pub mod block;
 pub mod transaction;
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use reqwest::Client as ReqwestClient;
 

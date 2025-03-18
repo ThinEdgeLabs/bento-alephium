@@ -1,5 +1,5 @@
 use crate::types::FetchStrategy;
-use crate::types::{BlockBatch, BlockRange, StageMessage, MAX_TIMESTAMP_RANGE};
+use crate::types::{BlockBatch, BlockRange, StageMessage};
 use crate::{
     client::{Client, Network},
     config::ProcessorConfig,
