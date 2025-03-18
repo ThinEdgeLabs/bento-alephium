@@ -181,6 +181,7 @@ impl StageHandler for StorageStage {
     }
 }
 
+#[allow(dead_code)]
 pub struct Pipeline {
     client: Arc<Client>,
     processor: Arc<ProcessorStage>,
@@ -188,13 +189,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(
-        client: Arc<Client>,
-        db_pool: Arc<DbPool>,
-        processor: Processor,
-        fetch_strategy: FetchStrategy,
-        sync_opts: SyncOptions,
-    ) -> Self {
+    pub fn new(client: Arc<Client>, db_pool: Arc<DbPool>, processor: Processor) -> Self {
         Self {
             client,
             processor: Arc::new(ProcessorStage { processor }),
@@ -308,20 +303,14 @@ impl Worker {
             let pool_clone = self.db_pool.clone();
             let client_clone = self.client.clone();
             let fetch_strategy_clone = self.fetch_strategy.clone();
-            let sync_opts_clone = self.sync_opts.clone();
+            let sync_opts_clone = self.sync_opts;
             let processor_config = processor_config.clone();
 
             let handle = tokio::spawn(async move {
                 let processor = build_processor(&processor_config, pool_clone.clone());
                 let processor_name = processor.name();
 
-                let pipeline = Pipeline::new(
-                    client_clone.clone(),
-                    pool_clone.clone(),
-                    processor,
-                    fetch_strategy_clone.clone(),
-                    sync_opts_clone.clone(),
-                );
+                let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
 
                 let last_ts = get_last_timestamp(&pool_clone, processor_name).await?;
                 let mut current_ts = sync_opts_clone.start_ts.unwrap_or(0).max(last_ts);

@@ -30,6 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    worker.run().await;
+    let _ = worker.run().await;
     Ok(())
 }
