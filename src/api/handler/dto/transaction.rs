@@ -40,7 +40,7 @@ pub struct TransactionHashQuery {
 #[derive(Debug, Deserialize, Default, IntoParams, ToSchema, Serialize)]
 #[into_params(style = Form, parameter_in = Query)]
 pub struct TransactionBlockQuery {
-    /// The blockhash to retrieve transactions 
+    /// The blockhash to retrieve transactions
     pub block_hash: String,
 }
 

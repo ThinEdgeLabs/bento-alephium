@@ -1,6 +1,7 @@
 use bento_alephium::{
     client::Network,
-    config::ProcessorConfig, workers::worker_v2::{SyncOptions, Worker},
+    config::ProcessorConfig,
+    workers::worker_v2::{SyncOptions, Worker},
 };
 
 #[tokio::main]
@@ -23,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             back_step: None,
             sync_duration: None,
         }),
-        None
+        None,
     )
     .await?;
 

@@ -2,7 +2,9 @@ use axum::extract::{Query, State};
 use axum::Json;
 
 use crate::api::error::AppError;
-use crate::api::handler::dto::{TransactionBlockQuery, TransactionDto, TransactionHashQuery, TransactionsQuery};
+use crate::api::handler::dto::{
+    TransactionBlockQuery, TransactionDto, TransactionHashQuery, TransactionsQuery,
+};
 use crate::api::AppState;
 use crate::api::Pagination;
 use crate::repository::{get_tx_by_hash, get_txs, get_txs_by_block};
@@ -86,4 +88,3 @@ pub async fn get_tx_by_block_handler(
     let tx_models = get_txs_by_block(db, &block_hash).await?;
     Ok(Json(tx_models))
 }
-

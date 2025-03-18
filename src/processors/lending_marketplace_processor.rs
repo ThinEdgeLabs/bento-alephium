@@ -129,17 +129,17 @@ pub fn convert_to_model(
 ) -> (Vec<LoanActionModel>, Vec<LoanDetailModel>) {
     let mut loan_actions = Vec::new();
     let mut loan_details = Vec::new();
-        for be in blocks {
-            let events = be.events;
-            for event in events {
-                if event.contract_address.eq(&contract_address) {
-                    if let Some(action) = LoanActionType::from_event_index(event.event_index) {
-                        handle_loan_action_event(&mut loan_actions, &event, action);
-                    } else if event.event_index == 1 {
-                        handle_loan_detail_event(&event, &mut loan_details);
-                    }
+    for be in blocks {
+        let events = be.events;
+        for event in events {
+            if event.contract_address.eq(&contract_address) {
+                if let Some(action) = LoanActionType::from_event_index(event.event_index) {
+                    handle_loan_action_event(&mut loan_actions, &event, action);
+                } else if event.event_index == 1 {
+                    handle_loan_detail_event(&event, &mut loan_details);
                 }
             }
+        }
     }
     (loan_actions, loan_details)
 }
@@ -241,10 +241,8 @@ fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<L
         loan_subcontract_id: event.fields[0].value.clone().to_string(),
         lending_token_id: event.fields[1].value.clone().to_string(),
         collateral_token_id: event.fields[2].value.clone().to_string(),
-        lending_amount: BigDecimal::from_f64(event.fields[3].value.as_f64().unwrap())
-            .unwrap(),
-        collateral_amount: BigDecimal::from_f64(event.fields[4].value.as_f64().unwrap())
-            .unwrap(),
+        lending_amount: BigDecimal::from_f64(event.fields[3].value.as_f64().unwrap()).unwrap(),
+        collateral_amount: BigDecimal::from_f64(event.fields[4].value.as_f64().unwrap()).unwrap(),
         interest_rate: BigDecimal::from_f64(event.fields[5].value.as_f64().unwrap()).unwrap(),
         duration: BigDecimal::from_f64(event.fields[6].value.as_f64().unwrap()).unwrap(),
         lender: event.fields[7].value.clone().to_string(),

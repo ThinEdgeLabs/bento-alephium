@@ -11,7 +11,7 @@ use diesel_async::RunQueryDsl;
 pub async fn insert_events_to_db(db: Arc<DbPool>, events: Vec<EventModel>) -> Result<()> {
     // Log the start with event count
     tracing::info!("Starting DB insertion process for {} events", events.len());
-    
+
     // 1. Acquire connection with timeout
     tracing::info!("Attempting to acquire DB connection");
     let conn_future = db.get();
@@ -20,31 +20,29 @@ pub async fn insert_events_to_db(db: Arc<DbPool>, events: Vec<EventModel>) -> Re
             let conn = result?;
             tracing::info!("Successfully acquired DB connection");
             conn
-        },
+        }
         Err(_) => {
             tracing::error!("Timed out waiting for database connection");
             return Err(anyhow::anyhow!("Timed out waiting for database connection"));
         }
     };
-    
+
     // Now try the full batch
     tracing::info!("Executing full insert query for {} events", events.len());
     match tokio::time::timeout(
         Duration::from_secs(30), // Increased timeout for larger batches
-        insert_into(crate::schema::events::table)
-            .values(&events)
-            .execute(&mut conn)
-    ).await {
-        Ok(result) => {
-            match result {
-                Ok(rows) => {
-                    tracing::info!("Successfully inserted {} events", rows);
-                    Ok(())
-                },
-                Err(e) => {
-                    tracing::error!("Database insert error: {}", e);
-                    Err(anyhow::anyhow!("Database insert error: {}", e))
-                }
+        insert_into(crate::schema::events::table).values(&events).execute(&mut conn),
+    )
+    .await
+    {
+        Ok(result) => match result {
+            Ok(rows) => {
+                tracing::info!("Successfully inserted {} events", rows);
+                Ok(())
+            }
+            Err(e) => {
+                tracing::error!("Database insert error: {}", e);
+                Err(anyhow::anyhow!("Database insert error: {}", e))
             }
         },
         Err(_) => {

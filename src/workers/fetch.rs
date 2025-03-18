@@ -1,10 +1,7 @@
 use std::{sync::Arc, time::Instant};
 
 use anyhow::Result;
-use futures::{
-    stream::{FuturesOrdered},
-    StreamExt,
-};
+use futures::{stream::FuturesOrdered, StreamExt};
 
 use crate::{
     client::Client,
@@ -21,9 +18,9 @@ pub async fn fetch_parallel(
     let chunk_size = total_time / num_workers as i64;
 
     tracing::info!(
-        "Starting parallel fetch with {} workers for range {}-{}", 
-        num_workers, 
-        range.from_ts, 
+        "Starting parallel fetch with {} workers for range {}-{}",
+        num_workers,
+        range.from_ts,
         range.to_ts
     );
 
@@ -34,20 +31,15 @@ pub async fn fetch_parallel(
         let to = if i == num_workers - 1 { range.to_ts } else { from + chunk_size };
 
         let range = BlockRange { from_ts: from, to_ts: to };
-        
-        tracing::debug!(
-            worker_id = i,
-            from_ts = from,
-            to_ts = to,
-            "Dispatching worker"
-        );
-        
+
+        tracing::debug!(worker_id = i, from_ts = from, to_ts = to, "Dispatching worker");
+
         futures.push_back(fetch_chunk(client.clone(), range));
     }
 
     let mut results = Vec::new();
     let mut completed_workers = 0;
-    
+
     while let Some(result) = futures.next().await {
         match result {
             Ok(batch) => {
@@ -59,33 +51,26 @@ pub async fn fetch_parallel(
                 results.push(batch);
             }
             Err(err) => {
-                let err_ctx = format!(
-                    "Failed to fetch chunk (worker {}/{})", 
-                    completed_workers, 
-                    num_workers
-                );
-                
+                let err_ctx =
+                    format!("Failed to fetch chunk (worker {}/{})", completed_workers, num_workers);
+
                 tracing::error!(
                     error = %err,
                     worker_id = completed_workers,
                     "Worker failed"
                 );
-                
+
                 return Err(err.context(err_ctx));
             }
         }
-        
+
         completed_workers += 1;
     }
 
-    tracing::info!(
-        "Parallel fetch completed successfully, retrieved {} batches",
-        results.len()
-    );
+    tracing::info!("Parallel fetch completed successfully, retrieved {} batches", results.len());
 
     Ok(results)
 }
-
 
 /// Fetch blocks in a given timestamp range
 /// Will return an error if the timestamp range exceeds the maximum limit of the nodes

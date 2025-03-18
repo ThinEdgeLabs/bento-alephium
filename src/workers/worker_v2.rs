@@ -58,8 +58,7 @@ impl StageHandler for ProcessorStage {
                     batch.range.to_ts,
                     elapsed
                 );
-                
-                
+
                 Ok(StageMessage::Processed(output))
             }
             _ => Ok(StageMessage::Complete),
@@ -158,7 +157,7 @@ impl StageHandler for StorageStage {
                                     elapsed
                                 );
                                 Ok(())
-                          }
+                            }
                             Err(e) => {
                                 tracing::error!("Failed to store transactions: {}", e);
                                 Err(e)
@@ -207,7 +206,7 @@ impl Pipeline {
         let channel_capacity = 100;
         let (process_tx, process_rx) = mpsc::channel(channel_capacity);
         let (storage_tx, storage_rx) = mpsc::channel(channel_capacity);
-        
+
         // Send the fetched batches to the processor
         for batch in batches {
             process_tx.send(StageMessage::Batch(batch)).await?;
@@ -306,7 +305,6 @@ impl Worker {
         let mut handles = Vec::new();
 
         for processor_config in self.processor_configs.clone() {
-            
             let pool_clone = self.db_pool.clone();
             let client_clone = self.client.clone();
             let fetch_strategy_clone = self.fetch_strategy.clone();
@@ -334,8 +332,12 @@ impl Worker {
                 loop {
                     let to_ts = current_ts + step;
                     let range = BlockRange { from_ts: current_ts, to_ts };
-                    let batches = fetch_parallel(client_clone.clone(), range, fetch_strategy_clone.num_workers())
-                        .await?;
+                    let batches = fetch_parallel(
+                        client_clone.clone(),
+                        range,
+                        fetch_strategy_clone.num_workers(),
+                    )
+                    .await?;
                     if let Err(err) = pipeline.run(batches).await {
                         tracing::error!(
                             processor_name = processor_name,
@@ -346,7 +348,6 @@ impl Worker {
                     } else {
                         update_last_timestamp(&pool_clone, processor_name, to_ts).await?;
                         current_ts = to_ts + 1;
-                        
                     }
 
                     tokio_sleep(sync_duration).await;
@@ -384,7 +385,6 @@ impl Worker {
         run_pending_migrations(&mut conn);
     }
 }
-
 
 pub async fn get_last_timestamp(db_pool: &Arc<DbPool>, processor_name: &str) -> Result<i64> {
     tracing::info!(processor = processor_name, "Getting last timestamp");
