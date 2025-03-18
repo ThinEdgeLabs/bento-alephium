@@ -1,5 +1,7 @@
 use crate::{
-    db::{DbPool, DbPoolConnection}, models::{block::BlockModel, event::EventModel, transaction::TransactionModel}, types::BlockAndEvents
+    db::{DbPool, DbPoolConnection},
+    models::{block::BlockModel, event::EventModel, transaction::TransactionModel},
+    types::BlockAndEvents,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -8,8 +10,9 @@ use default_processor::DefaultProcessor;
 use diesel_async::{pooled_connection::bb8::Pool, AsyncPgConnection};
 use event_processor::EventProcessor;
 use lending_marketplace_processor::{LendingContractProcessor, LoanActionModel, LoanDetailModel};
-use tx_processor::TxProcessor;
+
 use std::{fmt::Debug, sync::Arc};
+use tx_processor::TxProcessor;
 
 pub mod block_processor;
 pub mod default_processor;
@@ -27,11 +30,9 @@ pub enum ProcessorOutput {
     Default(()),
 }
 
-
 /// Base trait for all processors
 #[async_trait]
 pub trait ProcessorTrait: Send + Sync + Debug {
-
     type Output;
     fn name(&self) -> &'static str;
 
@@ -65,8 +66,8 @@ pub trait ProcessorTrait: Send + Sync + Debug {
         blocks: Vec<BlockAndEvents>,
     ) -> Result<Self::Output>;
 
-     // Convert the native output to the common ProcessorOutput enum
-     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput;
+    // Convert the native output to the common ProcessorOutput enum
+    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput;
 }
 
 #[derive(Debug)]
@@ -75,7 +76,7 @@ pub enum Processor {
     DefaultProcessor(DefaultProcessor),
     EventProcessor(EventProcessor),
     LendingContractProcessor(LendingContractProcessor),
-    TxProcessor(TxProcessor)
+    TxProcessor(TxProcessor),
 }
 
 impl Processor {
@@ -85,7 +86,7 @@ impl Processor {
             Processor::BlockProcessor(p) => p.connection_pool(),
             Processor::EventProcessor(p) => p.connection_pool(),
             Processor::LendingContractProcessor(p) => p.connection_pool(),
-            Processor::TxProcessor(p) => p.connection_pool()
+            Processor::TxProcessor(p) => p.connection_pool(),
         }
     }
 
@@ -95,7 +96,7 @@ impl Processor {
             Processor::BlockProcessor(p) => p.name(),
             Processor::EventProcessor(p) => p.name(),
             Processor::LendingContractProcessor(p) => p.name(),
-            Processor::TxProcessor(p) => p.name()
+            Processor::TxProcessor(p) => p.name(),
         }
     }
 
@@ -106,23 +107,22 @@ impl Processor {
         blocks: Vec<BlockAndEvents>,
     ) -> Result<ProcessorOutput> {
         match self {
-            Processor::DefaultProcessor(p) =>{
+            Processor::DefaultProcessor(p) => {
                 p.process_blocks(from_ts, to_ts, blocks).await?;
                 Ok(p.wrap_output(()))
-            },
+            }
             Processor::BlockProcessor(p) => {
                 let output = p.process_blocks(from_ts, to_ts, blocks).await?;
                 Ok(p.wrap_output(output))
-            },
+            }
             Processor::EventProcessor(p) => {
                 let output = p.process_blocks(from_ts, to_ts, blocks).await?;
                 Ok(p.wrap_output(output))
-            },
+            }
             Processor::LendingContractProcessor(p) => {
                 let output = p.process_blocks(from_ts, to_ts, blocks).await?;
                 Ok(p.wrap_output(output))
-
-            },
+            }
             Processor::TxProcessor(p) => {
                 let output = p.process_blocks(from_ts, to_ts, blocks).await?;
                 Ok(p.wrap_output(output))

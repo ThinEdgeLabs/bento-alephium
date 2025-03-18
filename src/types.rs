@@ -1,6 +1,6 @@
+use crate::processors::ProcessorOutput;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
 pub const DEFAULT_GROUP_NUM: i64 = 4;
 pub const REORG_TIMEOUT: i64 = 210 * 16 * 1000; // 210 blocks * 16 seconds
 
@@ -79,7 +79,7 @@ pub enum EventFieldType {
 pub struct EventField {
     #[serde(rename = "type")]
     pub field_type: EventFieldType,
-    pub value: String,
+    pub value: serde_json::Value,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -202,6 +202,51 @@ pub struct TimestampRange {
 pub enum Order {
     Asc,
     Desc,
+}
+
+#[derive(Clone)]
+pub enum StageMessage {
+    // Input of fetcher stage
+    Range(BlockRange),
+
+    // Input of processor stage
+    Batch(BlockBatch),
+
+    // Output of processor stage
+    Processed(ProcessorOutput),
+    Complete,
+}
+
+pub const MAX_TIMESTAMP_RANGE: i64 = 1800000;
+
+// Message types for different stages
+#[derive(Clone)]
+pub enum FetchStrategy {
+    Simple,
+    Chunked { chunk_size: i64 },
+    Parallel { num_workers: usize },
+}
+
+impl FetchStrategy {
+    pub fn num_workers(&self) -> usize {
+        match self {
+            FetchStrategy::Simple => 1,
+            FetchStrategy::Chunked { chunk_size: _ } => 1,
+            FetchStrategy::Parallel { num_workers } => *num_workers,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct BlockRange {
+    pub from_ts: i64,
+    pub to_ts: i64,
+}
+
+#[derive(Clone)]
+pub struct BlockBatch {
+    pub blocks: Vec<BlockAndEvents>,
+    pub range: BlockRange,
 }
 
 #[cfg(test)]

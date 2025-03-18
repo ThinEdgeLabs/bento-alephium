@@ -1,7 +1,10 @@
 pub mod block;
 pub mod transaction;
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
+use reqwest::Client as ReqwestClient;
 
-use std::env;
+use std::{env, time::Duration};
 #[derive(Clone, Debug)]
 pub enum Network {
     Development,
@@ -50,9 +53,11 @@ impl Default for Network {
 /// Struct representing a client that interacts with the Alephium node network.
 #[derive(Clone, Debug)]
 pub struct Client {
-    inner: reqwest::Client, // The inner HTTP client used for requests.
+    inner: reqwest_middleware::ClientWithMiddleware, // The inner HTTP client used for requests.
     base_url: String,       // The base URL for making requests to the node network.
 }
+
+
 
 
 impl Client {
@@ -66,6 +71,19 @@ impl Client {
     ///
     /// A new `Client` instance.
     pub fn new(network: Network) -> Self {
-        Self { inner: reqwest::Client::new(), base_url: network.base_url() }
+
+        let retry_policy = ExponentialBackoff::builder()
+        .retry_bounds(
+            Duration::from_millis(100), // Minimum retry delay
+            Duration::from_secs(10)     // Maximum retry delay
+        )
+        .build_with_max_retries(5);     // Maximum number of retries
+    
+    // Create client with retry middleware
+    let client = ClientBuilder::new(ReqwestClient::new())
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build();
+
+        Self { inner: client, base_url: network.base_url() }
     }
 }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::types::{BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange, BlocksPerTimestampRange, Transaction};
+use crate::types::{BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange, BlocksPerTimestampRange, StageMessage, Transaction};
 #[async_trait]
 pub trait BlockProvider {
     // List blocks on the given time interval.
@@ -32,3 +32,9 @@ pub trait TransactionProvider {
     async fn get_tx_by_hash(&self, tx_hash_value: &str) -> Result<Option<Transaction>>;
 }
 
+
+// Pipeline stage traits with message passing
+#[async_trait::async_trait]
+pub trait StageHandler: Send + 'static {
+    async fn handle(&self, input: StageMessage) -> Result<StageMessage>;
+}

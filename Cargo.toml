@@ -58,6 +58,9 @@ utoipa-axum = "0.2.0"
 utoipa = "5.3.1"
 utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
 rand = "0.9.0"
+reqwest-middleware = "0.4.1"
+reqwest-retry = "0.7.0"
+backoff = "0.4.0"
 
 
 [features]
