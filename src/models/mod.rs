@@ -54,8 +54,7 @@ pub fn convert_bwe_to_tx_models(blocks: Vec<BlockAndEvents>) -> Vec<TransactionM
     let mut iterator =  blocks.iter().map(|bwe| (bwe.block.hash.clone(), bwe.block.transactions.clone())).collect::<Vec<_>>();
     
     iterator.iter_mut().flat_map(|(block, transactions)| {
--        transactions.dedup_by(|a, b| a.unsigned.tx_id != b.unsigned.tx_id);
-+        transactions.dedup_by(|a, b| a.unsigned.tx_id == b.unsigned.tx_id);
+        transactions.dedup_by(|a, b| a.unsigned.tx_id == b.unsigned.tx_id);
         transactions.iter().map(move |t| TransactionModel {
             tx_hash: t.unsigned.tx_id.clone(),
             unsigned: serde_json::to_value(t.unsigned.clone()).unwrap_or_default(),

@@ -59,12 +59,6 @@ impl StageHandler for ProcessorStage {
                     elapsed
                 );
                 
-                // Process blocks
-                let output = self.processor.process_blocks(
-                    batch.range.from_ts,
-                    batch.range.to_ts,
-                    batch.blocks,
-                ).await?;
                 
                 Ok(StageMessage::Processed(output))
             }

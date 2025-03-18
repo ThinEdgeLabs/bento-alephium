@@ -5,7 +5,7 @@ use bento_alephium::{
     client::Network,
     config::ProcessorConfig,
     workers::worker_v2::{SyncOptions, Worker},
-
+};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load .env file
@@ -18,8 +18,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let processor_config = ProcessorConfig::LendingContractProcessor(
     //     "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF".into(),
     // );
-
-    let processor_config = ProcessorConfig::EventProcessor;
 
     let worker = Worker::new(
         vec![ProcessorConfig::TxProcessor, ProcessorConfig::BlockProcessor],
