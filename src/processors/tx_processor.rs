@@ -7,39 +7,39 @@ use async_trait::async_trait;
 use crate::{
     config::ProcessorConfig,
     db::DbPool,
-    models::{convert_bwe_to_event_models, event::EventModel},
+    models::{convert_bwe_to_tx_models, transaction::TransactionModel},
     types::BlockAndEvents,
 };
 
 use super::{ProcessorOutput, ProcessorTrait};
 
-pub struct EventProcessor {
+pub struct TxProcessor {
     connection_pool: Arc<DbPool>,
 }
 
-impl EventProcessor {
+impl TxProcessor {
     pub fn new(connection_pool: Arc<DbPool>) -> Self {
         Self { connection_pool }
     }
 }
 
-impl Debug for EventProcessor {
+impl Debug for TxProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.connection_pool.state();
         write!(
             f,
-            "EventProcessor {{ connections: {:?}  idle_connections: {:?} }}",
+            "TxProcessor {{ connections: {:?}  idle_connections: {:?} }}",
             state.connections, state.idle_connections
         )
     }
 }
 
 #[async_trait]
-impl ProcessorTrait for EventProcessor {
-    type Output = Vec<EventModel>;
+impl ProcessorTrait for TxProcessor {
+    type Output = Vec<TransactionModel>;
 
     fn name(&self) -> &'static str {
-        ProcessorConfig::EventProcessor.name()
+        ProcessorConfig::TxProcessor.name()
     }
 
     fn connection_pool(&self) -> &Arc<DbPool> {
@@ -52,19 +52,21 @@ impl ProcessorTrait for EventProcessor {
         _to: i64,
         blocks: Vec<BlockAndEvents>,
     ) -> Result<Self::Output> {
-        // Process events and insert to db
-        let models = convert_bwe_to_event_models(blocks);
-        if !models.is_empty() {
-            tracing::info!(
-                processor_name = ?self.name(),
-                count = ?models.len(),
-                "Processed events"
-            );
-        }
+        let models = convert_bwe_to_tx_models(blocks);
+        //
+
+        // if !models.is_empty() {
+        //     tracing::info!(
+        //         processor_name = ?self.name(),
+        //         count = ?models.len(),
+        //         "Found models to insert"
+        //     );
+        //     insert_txs_to_db(self.connection_pool.clone(), models).await?;
+        // }
         Ok(models)
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        ProcessorOutput::Event(output)
+        ProcessorOutput::Tx(output)
     }
 }

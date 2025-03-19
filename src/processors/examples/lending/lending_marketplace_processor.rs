@@ -82,7 +82,7 @@ impl ProcessorTrait for LendingContractProcessor {
         &self,
         _from: i64,
         _to: i64,
-        blocks: Vec<Vec<BlockAndEvents>>,
+        blocks: Vec<BlockAndEvents>,
     ) -> Result<()> {
         // Sanity check
         if !self.config.is_lending_contract_processor() {
@@ -122,7 +122,7 @@ pub async fn insert_loan_details_to_db(
 }
 
 pub fn convert_to_model(
-    blocks: Vec<Vec<BlockAndEvents>>,
+    blocks: Vec<BlockAndEvents>,
     contract_address: &str,
 ) -> (Vec<LoanActionModel>, Vec<LoanDetailModel>) {
     let mut loan_actions = Vec::new();
@@ -205,25 +205,25 @@ fn handle_loan_action_event(
     match action {
         LoanActionType::LoanCreated => {
             models.push(LoanActionModel {
-                loan_subcontract_id: event.fields[0].value.clone(),
+                loan_subcontract_id: event.fields[0].value.clone().to_string(),
 
                 action_type: action,
-                by: event.fields[2].value.clone(),
+                by: event.fields[2].value.clone().to_string(),
                 timestamp: timestamp_millis_to_naive_datetime(
-                    event.fields[3].value.parse::<i64>().unwrap(),
+                    event.fields[3].value.as_i64().unwrap(),
                 ),
                 loan_id: Some(
-                    BigDecimal::from_f64(event.fields[1].value.parse::<f64>().unwrap()).unwrap(),
+                    BigDecimal::from_f64(event.fields[1].value.as_f64().unwrap()).unwrap(),
                 ),
             });
         }
         _ => {
             models.push(LoanActionModel {
-                loan_subcontract_id: event.fields[0].value.clone(),
+                loan_subcontract_id: event.fields[0].value.clone().to_string(),
                 action_type: action,
-                by: event.fields[1].value.clone(),
+                by: event.fields[1].value.clone().to_string(),
                 timestamp: timestamp_millis_to_naive_datetime(
-                    event.fields[2].value.parse::<i64>().unwrap(),
+                    event.fields[2].value.as_i64().unwrap(),
                 ),
                 loan_id: None, // Other actions does not need this field
             });
@@ -238,15 +238,15 @@ fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<L
     }
 
     models.push(LoanDetailModel {
-        loan_subcontract_id: event.fields[0].value.clone(),
-        lending_token_id: event.fields[1].value.clone(),
-        collateral_token_id: event.fields[2].value.clone(),
-        lending_amount: BigDecimal::from_f64(event.fields[3].value.parse::<f64>().unwrap())
+        loan_subcontract_id: event.fields[0].value.clone().to_string(),
+        lending_token_id: event.fields[1].value.clone().to_string(),
+        collateral_token_id: event.fields[2].value.clone().to_string(),
+        lending_amount: BigDecimal::from_f64(event.fields[3].value.as_f64().unwrap())
             .unwrap(),
-        collateral_amount: BigDecimal::from_f64(event.fields[4].value.parse::<f64>().unwrap())
+        collateral_amount: BigDecimal::from_f64(event.fields[4].value.as_f64().unwrap())
             .unwrap(),
-        interest_rate: BigDecimal::from_f64(event.fields[5].value.parse::<f64>().unwrap()).unwrap(),
-        duration: BigDecimal::from_f64(event.fields[6].value.parse::<f64>().unwrap()).unwrap(),
-        lender: event.fields[7].value.clone(),
+        interest_rate: BigDecimal::from_f64(event.fields[5].value.as_f64().unwrap()).unwrap(),
+        duration: BigDecimal::from_f64(event.fields[6].value.as_f64().unwrap()).unwrap(),
+        lender: event.fields[7].value.clone().to_string(),
     });
 }

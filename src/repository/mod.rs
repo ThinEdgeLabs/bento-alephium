@@ -9,13 +9,15 @@ pub use event::*;
 pub use transaction::*;
 
 use crate::{
+    api::error::RepositoryError,
     db::DbPool,
-    models::{block::BlockModel, event::EventModel},
+    models::{block::BlockModel, event::EventModel, transaction::TransactionModel},
     types::BlockHash,
 };
-use anyhow::{Ok, Result};
+use anyhow::Ok;
+use anyhow::Result;
 use diesel::insert_into;
-use diesel::query_dsl::methods::FilterDsl;
+use diesel::prelude::*;
 use diesel::ExpressionMethods;
 use diesel_async::{scoped_futures::ScopedFutureExt, AsyncConnection, RunQueryDsl};
 
@@ -116,4 +118,22 @@ pub async fn update_main_chain_status(
         .await?;
     }
     Ok(())
+}
+
+pub async fn get_block_transactions(
+    db: Arc<DbPool>,
+    block_hash_value: BlockHash,
+) -> Result<Vec<TransactionModel>> {
+    let block_model = get_block_by_hash(db.clone(), &block_hash_value).await?;
+
+    if let Some(block_model) = block_model {
+        let mut conn = db.get().await?;
+        let transaction_models = TransactionModel::belonging_to(&block_model)
+            .select(TransactionModel::as_select())
+            .load(&mut conn)
+            .await?;
+        Ok(transaction_models)
+    } else {
+        Err(RepositoryError::BlockNotFound(block_hash_value).into())
+    }
 }

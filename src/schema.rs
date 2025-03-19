@@ -21,7 +21,7 @@ diesel::table! {
 
 diesel::table! {
     events (id) {
-        id -> Int4,
+        id -> Text,
         tx_id -> Text,
         contract_address -> Text,
         event_index -> Int4,
@@ -74,7 +74,7 @@ diesel::table! {
         created_at -> Nullable<Timestamptz>,
         updated_at -> Nullable<Timestamptz>,
         main_chain -> Bool,
-        block_hash -> Text,
+        block_hash -> Nullable<Text>,
     }
 }
 

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 
 use crate::{config::ProcessorConfig, db::DbPool, types::BlockAndEvents};
 
-use super::ProcessorTrait;
+use super::{ProcessorOutput, ProcessorTrait};
 
 pub struct DefaultProcessor {
     connection_pool: Arc<DbPool>,
@@ -31,6 +31,7 @@ impl Debug for DefaultProcessor {
 
 #[async_trait]
 impl ProcessorTrait for DefaultProcessor {
+    type Output = ();
     fn name(&self) -> &'static str {
         ProcessorConfig::DefaultProcessor.name()
     }
@@ -43,9 +44,13 @@ impl ProcessorTrait for DefaultProcessor {
         &self,
         _from: i64,
         _to: i64,
-        _blocks: Vec<Vec<BlockAndEvents>>,
-    ) -> Result<()> {
+        _blocks: Vec<BlockAndEvents>,
+    ) -> Result<Self::Output> {
         // Process blocks and events
         Ok(())
+    }
+
+    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
+        ProcessorOutput::Default(output)
     }
 }

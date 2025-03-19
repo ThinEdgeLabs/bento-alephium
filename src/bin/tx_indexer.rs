@@ -1,7 +1,7 @@
 use bento_alephium::{
     client::Network,
     config::ProcessorConfig,
-    worker::{SyncOptions, Worker},
+    workers::worker_v2::{SyncOptions, Worker},
 };
 
 #[tokio::main]
@@ -13,12 +13,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::LendingContractProcessor(
-        "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF".into(),
-    );
+    let processor_config = ProcessorConfig::TxProcessor;
 
-    let mut worker = Worker::new(
-        processor_config,
+    let worker = Worker::new(
+        vec![processor_config],
         database_url,
         Network::Testnet,
         None,
@@ -28,9 +26,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             back_step: None,
             sync_duration: None,
         }),
+        None,
     )
     .await?;
 
-    worker.run().await;
+    let _ = worker.run().await;
     Ok(())
 }
