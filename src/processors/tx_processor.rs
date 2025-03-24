@@ -36,7 +36,7 @@ impl Debug for TxProcessor {
 
 #[async_trait]
 impl ProcessorTrait for TxProcessor {
-    type Output = Vec<TransactionModel>;
+    type Output = ProcessorOutput;
 
     fn name(&self) -> &'static str {
         ProcessorConfig::TxProcessor.name()
@@ -63,10 +63,10 @@ impl ProcessorTrait for TxProcessor {
         //     );
         //     insert_txs_to_db(self.connection_pool.clone(), models).await?;
         // }
-        Ok(models)
+        Ok(ProcessorOutput::Tx(models))
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        ProcessorOutput::Tx(output)
+        output
     }
 }

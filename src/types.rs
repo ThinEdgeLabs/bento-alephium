@@ -204,7 +204,6 @@ pub enum Order {
     Desc,
 }
 
-#[derive(Clone)]
 pub enum StageMessage {
     // Input of fetcher stage
     Range(BlockRange),

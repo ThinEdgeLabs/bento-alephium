@@ -20,7 +20,7 @@ use serde::Serialize;
 
 use diesel::FromSqlRow;
 
-use super::ProcessorOutput;
+use super::{CustomProcessorOutput, ProcessorOutput};
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
 #[diesel(table_name = crate::schema::loan_actions)]
@@ -69,9 +69,21 @@ impl Debug for LendingContractProcessor {
     }
 }
 
+type LendingContractOutput = (Vec<LoanActionModel>, Vec<LoanDetailModel>);
+
+impl CustomProcessorOutput for LendingContractOutput {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn CustomProcessorOutput> {
+        Box::new(self.clone())
+    }
+}
+
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
-    type Output = (Vec<LoanActionModel>, Vec<LoanDetailModel>);
+    type Output = ProcessorOutput;
 
     fn name(&self) -> &'static str {
         ProcessorConfig::LendingContractProcessor("".into()).name()
@@ -95,11 +107,12 @@ impl ProcessorTrait for LendingContractProcessor {
         // if !loan_details.is_empty() {
         //     insert_loan_details_to_db(self.connection_pool.clone(), loan_details).await?;
         // }
-        Ok(loan_actions.into_iter().zip(loan_details.into_iter()).collect())
+        // Ok(loan_actions.into_iter().zip(loan_details.into_iter()).collect())
+        Ok(ProcessorOutput::Custom(Arc::new((loan_actions, loan_details))))
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        ProcessorOutput::LendingContract(output)
+        output
     }
 }
 

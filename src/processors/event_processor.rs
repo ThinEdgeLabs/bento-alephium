@@ -36,7 +36,7 @@ impl Debug for EventProcessor {
 
 #[async_trait]
 impl ProcessorTrait for EventProcessor {
-    type Output = Vec<EventModel>;
+    type Output = ProcessorOutput;
 
     fn name(&self) -> &'static str {
         ProcessorConfig::EventProcessor.name()
@@ -61,10 +61,10 @@ impl ProcessorTrait for EventProcessor {
                 "Processed events"
             );
         }
-        Ok(models)
+        Ok(ProcessorOutput::Event(models))
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        ProcessorOutput::Event(output)
+        output
     }
 }

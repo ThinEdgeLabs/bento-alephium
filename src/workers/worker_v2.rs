@@ -6,13 +6,14 @@ use crate::{
     db::{new_db_pool, DbPool},
     processors::{
         block_processor::BlockProcessor,
-        default_processor::DefaultProcessor,
         event_processor::EventProcessor,
         lending_marketplace_processor::{
             insert_loan_actions_to_db, insert_loan_details_to_db, LendingContractProcessor,
         },
         tx_processor::TxProcessor,
+        new_processor,
         Processor, ProcessorOutput,
+        DynProcessor,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
     schema::processor_status,
@@ -30,153 +31,72 @@ use tokio::{sync::mpsc, time::sleep as tokio_sleep};
 use super::fetch::fetch_parallel;
 
 pub struct ProcessorStage {
-    processor: Processor,
+    processor: DynProcessor,
+}
+
+impl ProcessorStage {
+    pub fn new(processor: DynProcessor) -> Self {
+        Self { processor }
+    }
 }
 
 #[async_trait::async_trait]
 impl StageHandler for ProcessorStage {
-    async fn handle(&self, input: StageMessage) -> Result<StageMessage> {
-        match input {
+    async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
+        match msg {
             StageMessage::Batch(batch) => {
-                let block_count = batch.blocks.len();
-                let start = Instant::now();
-                if block_count == 0 {
-                    return Ok(StageMessage::Complete);
-                }
-                // Process blocks
-                let output = self
-                    .processor
-                    .process_blocks(batch.range.from_ts, batch.range.to_ts, batch.blocks)
-                    .await?;
-
-                let elapsed = start.elapsed();
-
-                tracing::info!(
-                    "Processed {} blocks (range: {} to {}) in {:.2?}",
-                    block_count,
+                let output = self.processor.process_blocks(
                     batch.range.from_ts,
                     batch.range.to_ts,
-                    elapsed
-                );
-
+                    batch.blocks,
+                ).await?;
                 Ok(StageMessage::Processed(output))
             }
-            _ => Ok(StageMessage::Complete),
+            _ => Ok(msg),
         }
     }
 }
+
 pub struct StorageStage {
     db_pool: Arc<DbPool>,
 }
 
+impl StorageStage {
+    pub fn new(db_pool: Arc<DbPool>) -> Self {
+        Self { db_pool }
+    }
+}
+
 #[async_trait::async_trait]
 impl StageHandler for StorageStage {
-    async fn handle(&self, input: StageMessage) -> Result<StageMessage> {
-        match input {
+    async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
+        match msg {
             StageMessage::Processed(output) => {
-                let start = Instant::now();
-
-                let result = match output {
+                match output {
                     ProcessorOutput::Block(blocks) => {
-                        let count = blocks.len();
-                        match insert_blocks_to_db(self.db_pool.clone(), blocks).await {
-                            Ok(_) => {
-                                let elapsed = start.elapsed();
-                                tracing::info!(
-                                    "Successfully stored {} blocks in {:.2?}",
-                                    count,
-                                    elapsed
-                                );
-                                Ok(())
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to store blocks: {}", e);
-                                Err(e)
-                            }
+                        if !blocks.is_empty() {
+                            insert_blocks_to_db(self.db_pool.clone(), blocks).await?;
                         }
                     }
                     ProcessorOutput::Event(events) => {
-                        let count = events.len();
-                        match insert_events_to_db(self.db_pool.clone(), events).await {
-                            Ok(_) => {
-                                let elapsed = start.elapsed();
-                                tracing::info!(
-                                    "Successfully stored {} events in {:.2?}",
-                                    count,
-                                    elapsed
-                                );
-                                Ok(())
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to store events: {}", e);
-                                Err(e)
-                            }
-                        }
-                    }
-                    ProcessorOutput::LendingContract((loan_actions, loan_details)) => {
-                        let action_count = loan_actions.len();
-                        let details_count = loan_details.len();
-                        let store_start = Instant::now();
-
-                        let actions_result =
-                            insert_loan_actions_to_db(self.db_pool.clone(), loan_actions).await;
-                        let actions_elapsed = store_start.elapsed();
-
-                        let details_start = Instant::now();
-                        let details_result =
-                            insert_loan_details_to_db(self.db_pool.clone(), loan_details).await;
-                        let details_elapsed = details_start.elapsed();
-
-                        match (actions_result, details_result) {
-                            (Ok(_), Ok(_)) => {
-                                let total_elapsed = start.elapsed();
-                                tracing::info!(
-                                    "Successfully stored lending contract data: {} actions in {:.2?}, {} details in {:.2?}, total {:.2?}",
-                                    action_count,
-                                    actions_elapsed,
-                                    details_count,
-                                    details_elapsed,
-                                    total_elapsed
-                                );
-                                Ok(())
-                            }
-                            (Err(e), _) | (_, Err(e)) => {
-                                tracing::error!("Failed to store lending contract data: {}", e);
-                                Err(e)
-                            }
+                        if !events.is_empty() {
+                            insert_events_to_db(self.db_pool.clone(), events).await?;
                         }
                     }
                     ProcessorOutput::Tx(txs) => {
-                        let count = txs.len();
-                        match insert_txs_to_db(self.db_pool.clone(), txs).await {
-                            Ok(_) => {
-                                let elapsed = start.elapsed();
-                                tracing::info!(
-                                    "Successfully stored {} transactions in {:.2?}",
-                                    count,
-                                    elapsed
-                                );
-                                Ok(())
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to store transactions: {}", e);
-                                Err(e)
-                            }
+                        if !txs.is_empty() {
+                            insert_txs_to_db(self.db_pool.clone(), txs).await?;
                         }
                     }
-                    ProcessorOutput::Default(()) => {
-                        let elapsed = start.elapsed();
-                        tracing::info!("Processed default output in {:.2?}", elapsed);
-                        Ok(())
+                    ProcessorOutput::Custom(_) => {
+                        // Custom processor outputs need to handle their own storage
+                        tracing::info!("Custom processor output received - storage handled by processor");
                     }
-                };
-
-                match result {
-                    Ok(_) => Ok(StageMessage::Complete),
-                    Err(e) => Err(e),
+                    _ => {}
                 }
+                Ok(StageMessage::Complete)
             }
-            _ => Ok(StageMessage::Complete),
+            _ => Ok(msg),
         }
     }
 }
@@ -189,7 +109,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(client: Arc<Client>, db_pool: Arc<DbPool>, processor: Processor) -> Self {
+    pub fn new(client: Arc<Client>, db_pool: Arc<DbPool>, processor: DynProcessor) -> Self {
         Self {
             client,
             processor: Arc::new(ProcessorStage { processor }),
@@ -265,6 +185,7 @@ impl Pipeline {
         Ok(())
     }
 }
+
 pub struct Worker {
     pub db_pool: Arc<DbPool>,
     pub client: Arc<Client>,
@@ -295,6 +216,7 @@ impl Worker {
             fetch_strategy: fetch_strategy.unwrap_or(FetchStrategy::Simple),
         })
     }
+
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
         let mut handles = Vec::new();
@@ -413,21 +335,20 @@ pub async fn update_last_timestamp(
 }
 
 /// Build a processor based on the configuration.
-pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> Processor {
+pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> DynProcessor {
     match config {
-        ProcessorConfig::DefaultProcessor => {
-            Processor::DefaultProcessor(DefaultProcessor::new(db_pool))
+        ProcessorConfig::BlockProcessor => {
+            new_processor(BlockProcessor::new(db_pool))
         }
-        ProcessorConfig::BlockProcessor => Processor::BlockProcessor(BlockProcessor::new(db_pool)),
-        ProcessorConfig::EventProcessor => Processor::EventProcessor(EventProcessor::new(db_pool)),
+        ProcessorConfig::EventProcessor => {
+            new_processor(EventProcessor::new(db_pool))
+        }
         ProcessorConfig::LendingContractProcessor(contract_address) => {
-            Processor::LendingContractProcessor(LendingContractProcessor::new(
-                db_pool,
-                contract_address.clone(),
-            ))
+            new_processor(LendingContractProcessor::new(db_pool, contract_address.clone()))
         }
-
-        ProcessorConfig::TxProcessor => Processor::TxProcessor(TxProcessor::new(db_pool)),
+        ProcessorConfig::TxProcessor => {
+            new_processor(TxProcessor::new(db_pool))
+        }
     }
 }
 

@@ -36,7 +36,7 @@ impl Debug for BlockProcessor {
 
 #[async_trait]
 impl ProcessorTrait for BlockProcessor {
-    type Output = Vec<BlockModel>;
+    type Output = ProcessorOutput;
 
     fn name(&self) -> &'static str {
         ProcessorConfig::BlockProcessor.name()
@@ -52,19 +52,12 @@ impl ProcessorTrait for BlockProcessor {
         _to: i64,
         blocks: Vec<BlockAndEvents>,
     ) -> Result<Self::Output> {
-        // Process blocks and insert to db
         let models = convert_bwe_to_block_models(blocks);
-        // if !models.is_empty() {
-        //     insert_blocks_to_db(self.connection_pool.clone(), models).await?;
-        // }
-
-        Ok(models)
-        // handle reorgs
-        // Ok(())
+        Ok(ProcessorOutput::Block(models))
     }
 
     fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        ProcessorOutput::Block(output)
+        output
     }
 }
 
