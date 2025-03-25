@@ -1,11 +1,13 @@
 use std::fmt::Debug;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
-use crate::types::ContractEventByBlockHash;
-use crate::utils::timestamp_millis_to_naive_datetime;
-use crate::{db::DbPool, types::BlockAndEvents};
-use anyhow::Result;
+use bento_alephium::db::new_db_pool;
+use bento_alephium::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
+use bento_alephium::types::ContractEventByBlockHash;
+use bento_alephium::utils::timestamp_millis_to_naive_datetime;
+use bento_alephium::{db::DbPool, types::BlockAndEvents};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::NaiveDateTime;
@@ -17,10 +19,61 @@ use diesel_async::RunQueryDsl;
 use diesel_enum::DbEnum;
 use serde::Serialize;
 
+
 use diesel::FromSqlRow;
 
+use std::vec;
+
+use bento_alephium::types::FetchStrategy;
+use bento_alephium::{
+    client::Network,
+    config::ProcessorConfig,
+    workers::worker_v2::{SyncOptions, Worker},
+};
+
+fn register_lending_contract(pool: Arc<DbPool>, args: Option<serde_json::Value>) -> Box<dyn bento_alephium::processors::ProcessorTrait> {
+    let contract_address = if let Some(args) = args {
+        args.get("contract_address")
+            .and_then(|v| v.as_str())
+            .unwrap().to_string()
+    } else {
+        panic!("Missing contract address argument")
+    };
+
+    Box::new(LendingContractProcessor::new(pool, contract_address.into()))
+}
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load .env file
+    dotenvy::dotenv().ok();
+
+    // Setup logger
+    tracing_subscriber::fmt().init();
+
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let processor_config = ProcessorConfig::Custom { name: "lending processor".to_string(), factory: register_lending_contract, args: Some(serde_json::json!({"contract_address": "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"})) };
+    let worker = Worker::new(
+        vec![processor_config],
+        database_url,
+        Network::Testnet,
+        None,
+        Some(SyncOptions {
+            start_ts: Some(1716560632750),
+            step: Some(1800000 * 10),
+            back_step: None,
+            sync_duration: None,
+        }),
+        Some(FetchStrategy::Parallel { num_workers: 10 }),
+    )
+    .await?;
+
+    let _ = worker.run().await;
+    Ok(())
+}
+
+
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = crate::schema::loan_actions)]
+#[diesel(table_name = bento_alephium::schema::loan_actions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanActionModel {
     loan_subcontract_id: String,
@@ -31,7 +84,7 @@ pub struct LoanActionModel {
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = crate::schema::loan_details)]
+#[diesel(table_name = bento_alephium::schema::loan_details)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanDetailModel {
     loan_subcontract_id: String,
@@ -154,7 +207,7 @@ pub async fn insert_loan_actions_to_db(
     actions: Vec<LoanActionModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(crate::schema::loan_actions::table).values(&actions).execute(&mut conn).await?;
+    insert_into(bento_alephium::schema::loan_actions::table).values(&actions).execute(&mut conn).await?;
     Ok(())
 }
 
@@ -164,11 +217,10 @@ pub async fn insert_loan_details_to_db(
     details: Vec<LoanDetailModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(crate::schema::loan_details::table).values(&details).execute(&mut conn).await?;
+    insert_into(bento_alephium::schema::loan_details::table).values(&details).execute(&mut conn).await?;
     Ok(())
 }
 
-// The rest of your implementation remains the same
 pub fn convert_to_model(
     blocks: Vec<BlockAndEvents>,
     contract_address: &str,
@@ -257,10 +309,10 @@ fn handle_loan_action_event(
                 action_type: action,
                 by: event.fields[2].value.clone().to_string(),
                 timestamp: timestamp_millis_to_naive_datetime(
-                    event.fields[3].value.as_i64().unwrap(),
+                    event.fields[3].value.as_str().unwrap().parse::<i64>().unwrap(),
                 ),
                 loan_id: Some(
-                    BigDecimal::from_f64(event.fields[1].value.as_f64().unwrap()).unwrap(),
+                    BigDecimal::from_str(event.fields[1].value.as_str().unwrap()).unwrap(),
                 ),
             });
         }
@@ -270,7 +322,7 @@ fn handle_loan_action_event(
                 action_type: action,
                 by: event.fields[1].value.clone().to_string(),
                 timestamp: timestamp_millis_to_naive_datetime(
-                    event.fields[2].value.as_i64().unwrap(),
+                    event.fields[2].value.as_str().unwrap().parse::<i64>().unwrap(),
                 ),
                 loan_id: None, // Other actions does not need this field
             });
@@ -285,14 +337,15 @@ fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<L
         tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
     }
 
+    println!("{:?}", event.fields[3].value);
     models.push(LoanDetailModel {
         loan_subcontract_id: event.fields[0].value.clone().to_string(),
         lending_token_id: event.fields[1].value.clone().to_string(),
         collateral_token_id: event.fields[2].value.clone().to_string(),
-        lending_amount: BigDecimal::from_f64(event.fields[3].value.as_f64().unwrap()).unwrap(),
-        collateral_amount: BigDecimal::from_f64(event.fields[4].value.as_f64().unwrap()).unwrap(),
-        interest_rate: BigDecimal::from_f64(event.fields[5].value.as_f64().unwrap()).unwrap(),
-        duration: BigDecimal::from_f64(event.fields[6].value.as_f64().unwrap()).unwrap(),
+        lending_amount: BigDecimal::from_f64(event.fields[3].value.as_str().unwrap().parse::<f64>().unwrap()).unwrap(),
+        collateral_amount: BigDecimal::from_f64(event.fields[4].value.as_str().unwrap().parse::<f64>().unwrap()).unwrap(),
+        interest_rate: BigDecimal::from_f64(event.fields[5].value.as_str().unwrap().parse::<f64>().unwrap()).unwrap(),
+        duration: BigDecimal::from_f64(event.fields[6].value.as_str().unwrap().parse::<f64>().unwrap()).unwrap(),
         lender: event.fields[7].value.clone().to_string(),
     });
 }

@@ -7,7 +7,7 @@ use crate::{
     db::{new_db_pool, DbPool},
     processors::{
         block_processor::BlockProcessor, event_processor::EventProcessor,
-        lending_marketplace_processor::LendingContractProcessor, new_processor,
+        new_processor,
         tx_processor::TxProcessor, DynProcessor, ProcessorOutput,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
@@ -196,9 +196,7 @@ impl Worker {
         sync_opts: Option<SyncOptions>,
         fetch_strategy: Option<FetchStrategy>,
     ) -> Result<Self> {
-        let db_pool =
-            new_db_pool(&db_url, db_pool_size).await.context("Failed to create connection pool")?;
-
+        let db_pool = new_db_pool(&db_url, db_pool_size).await?;
         Ok(Self {
             db_pool: db_pool.clone(),
             processor_configs,
@@ -221,7 +219,7 @@ impl Worker {
             let processor_config = processor_config.clone();
 
             let handle = tokio::spawn(async move {
-                let processor = build_processor(&processor_config, pool_clone.clone());
+                let processor = processor_config.build_processor(pool_clone.clone());
                 let processor_name = processor.name();
 
                 let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
@@ -289,17 +287,6 @@ impl Worker {
     }
 }
 
-/// Build a processor based on the configuration.
-pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> DynProcessor {
-    match config {
-        ProcessorConfig::BlockProcessor => new_processor(BlockProcessor::new(db_pool)),
-        ProcessorConfig::EventProcessor => new_processor(EventProcessor::new(db_pool)),
-        ProcessorConfig::LendingContractProcessor(contract_address) => {
-            new_processor(LendingContractProcessor::new(db_pool, contract_address.clone()))
-        }
-        ProcessorConfig::TxProcessor => new_processor(TxProcessor::new(db_pool)),
-    }
-}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {

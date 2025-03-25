@@ -2,7 +2,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 pub mod block_processor;
 pub mod event_processor;
-pub mod lending_marketplace_processor;
 pub mod tx_processor;
 use std::{fmt::Debug, sync::Arc};
 
