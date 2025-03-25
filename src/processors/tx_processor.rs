@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use crate::{
     config::ProcessorConfig,
     db::DbPool,
-    models::{convert_bwe_to_tx_models, transaction::TransactionModel},
+    models::convert_bwe_to_tx_models,
     types::BlockAndEvents,
 };
 

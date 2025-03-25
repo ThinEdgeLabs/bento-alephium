@@ -86,7 +86,6 @@ impl StageHandler for StorageStage {
                             "Custom processor output received - storage handled by processor"
                         );
                     }
-                    _ => {}
                 }
                 Ok(StageMessage::Complete)
             }

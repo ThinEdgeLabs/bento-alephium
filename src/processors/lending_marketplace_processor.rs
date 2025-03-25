@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::config::ProcessorConfig;
 use crate::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
 use crate::types::ContractEventByBlockHash;
 use crate::utils::timestamp_millis_to_naive_datetime;
