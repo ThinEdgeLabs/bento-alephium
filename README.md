@@ -203,28 +203,6 @@ The factory function pattern allows for:
 - Multiple processor instances with different configurations
 - Clean separation between processor creation and usage
 
-### Event Field Structure
-
-1. **Loan Action Events**:
-   - Field 0: loan_subcontract_id (String)
-   - For LoanCreated:
-     - Field 1: loan_id (BigDecimal)
-     - Field 2: by (String)
-     - Field 3: timestamp (i64)
-   - For Other Actions:
-     - Field 1: by (String)
-     - Field 2: timestamp (i64)
-
-2. **Loan Detail Events** (event_index = 1):
-   - Field 0: loan_subcontract_id (String)
-   - Field 1: lending_token_id (String)
-   - Field 2: collateral_token_id (String)
-   - Field 3: lending_amount (f64)
-   - Field 4: collateral_amount (f64)
-   - Field 5: interest_rate (f64)
-   - Field 6: duration (f64)
-   - Field 7: lender (String)
-
 ### Running the Processor
 
 ```rust
@@ -285,12 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
    - Use environment variables for database configuration
    - Pass contract address through processor args
    - Configure appropriate sync options
-   - Use parallel processing when possible
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Insert your license information here]
