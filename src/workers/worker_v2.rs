@@ -5,15 +5,9 @@ use crate::{
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
     processors::{
-        block_processor::BlockProcessor,
-        event_processor::EventProcessor,
-        lending_marketplace_processor::{
-            insert_loan_actions_to_db, insert_loan_details_to_db, LendingContractProcessor,
-        },
-        tx_processor::TxProcessor,
-        new_processor,
-        ProcessorOutput,
-        DynProcessor,
+        block_processor::BlockProcessor, event_processor::EventProcessor,
+        lending_marketplace_processor::LendingContractProcessor, new_processor,
+        tx_processor::TxProcessor, DynProcessor, ProcessorOutput,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
     schema::processor_status,
@@ -44,11 +38,10 @@ impl StageHandler for ProcessorStage {
     async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
         match msg {
             StageMessage::Batch(batch) => {
-                let output = self.processor.process_blocks(
-                    batch.range.from_ts,
-                    batch.range.to_ts,
-                    batch.blocks,
-                ).await?;
+                let output = self
+                    .processor
+                    .process_blocks(batch.range.from_ts, batch.range.to_ts, batch.blocks)
+                    .await?;
                 Ok(StageMessage::Processed(output))
             }
             _ => Ok(msg),
@@ -89,7 +82,9 @@ impl StageHandler for StorageStage {
                     }
                     ProcessorOutput::Custom(_) => {
                         // Custom processor outputs need to handle their own storage
-                        tracing::info!("Custom processor output received - storage handled by processor");
+                        tracing::info!(
+                            "Custom processor output received - storage handled by processor"
+                        );
                     }
                     _ => {}
                 }
@@ -336,18 +331,12 @@ pub async fn update_last_timestamp(
 /// Build a processor based on the configuration.
 pub fn build_processor(config: &ProcessorConfig, db_pool: Arc<DbPool>) -> DynProcessor {
     match config {
-        ProcessorConfig::BlockProcessor => {
-            new_processor(BlockProcessor::new(db_pool))
-        }
-        ProcessorConfig::EventProcessor => {
-            new_processor(EventProcessor::new(db_pool))
-        }
+        ProcessorConfig::BlockProcessor => new_processor(BlockProcessor::new(db_pool)),
+        ProcessorConfig::EventProcessor => new_processor(EventProcessor::new(db_pool)),
         ProcessorConfig::LendingContractProcessor(contract_address) => {
             new_processor(LendingContractProcessor::new(db_pool, contract_address.clone()))
         }
-        ProcessorConfig::TxProcessor => {
-            new_processor(TxProcessor::new(db_pool))
-        }
+        ProcessorConfig::TxProcessor => new_processor(TxProcessor::new(db_pool)),
     }
 }
 

@@ -101,20 +101,17 @@ impl ProcessorTrait for LendingContractProcessor {
     ) -> Result<ProcessorOutput> {
         // Process blocks and convert to models
         let (loan_actions, loan_details) = convert_to_model(blocks, &self.contract_address);
-        
+
         tracing::info!(
             "Processed {} loan actions and {} loan details",
             loan_actions.len(),
             loan_details.len()
         );
-        
+
         // Return custom output
-        Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput {
-            loan_actions,
-            loan_details,
-        })))
+        Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput { loan_actions, loan_details })))
     }
-    
+
     // Override storage method to handle our custom output
     async fn store_output(&self, output: ProcessorOutput) -> Result<()> {
         if let ProcessorOutput::Custom(custom) = output {
@@ -122,17 +119,19 @@ impl ProcessorTrait for LendingContractProcessor {
             if let Some(lending_output) = custom.as_any().downcast_ref::<LendingContractOutput>() {
                 let loan_actions = &lending_output.loan_actions;
                 let loan_details = &lending_output.loan_details;
-                
+
                 // Store loan actions
                 if !loan_actions.is_empty() {
-                    insert_loan_actions_to_db(self.connection_pool.clone(), loan_actions.clone()).await?;
+                    insert_loan_actions_to_db(self.connection_pool.clone(), loan_actions.clone())
+                        .await?;
                 }
-                
+
                 // Store loan details
                 if !loan_details.is_empty() {
-                    insert_loan_details_to_db(self.connection_pool.clone(), loan_details.clone()).await?;
+                    insert_loan_details_to_db(self.connection_pool.clone(), loan_details.clone())
+                        .await?;
                 }
-                
+
                 tracing::info!(
                     "Stored {} loan actions and {} loan details",
                     loan_actions.len(),
@@ -145,7 +144,7 @@ impl ProcessorTrait for LendingContractProcessor {
             // This should not happen as we only return Custom output
             return Err(anyhow::anyhow!("Expected Custom output type"));
         }
-        
+
         Ok(())
     }
 }
@@ -298,5 +297,3 @@ fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<L
         lender: event.fields[7].value.clone().to_string(),
     });
 }
-
-

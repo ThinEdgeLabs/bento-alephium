@@ -6,10 +6,7 @@ pub mod lending_marketplace_processor;
 pub mod tx_processor;
 use std::{fmt::Debug, sync::Arc};
 
-use crate::{
-    db::DbPool,
-    types::BlockAndEvents,
-};
+use crate::{db::DbPool, types::BlockAndEvents};
 
 /// Trait for custom processor outputs
 pub trait CustomProcessorOutput: Send + Sync + Debug + 'static {
@@ -42,24 +39,27 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
         to_ts: i64,
         blocks: Vec<BlockAndEvents>,
     ) -> Result<ProcessorOutput>;
-    
+
     /// Store the processing output
     /// Default implementation for built-in processors. Custom processors need to override this method.
     async fn store_output(&self, output: ProcessorOutput) -> Result<()> {
         match output {
             ProcessorOutput::Block(blocks) => {
                 if !blocks.is_empty() {
-                    crate::repository::insert_blocks_to_db(self.connection_pool().clone(), blocks).await?;
+                    crate::repository::insert_blocks_to_db(self.connection_pool().clone(), blocks)
+                        .await?;
                 }
             }
             ProcessorOutput::Event(events) => {
                 if !events.is_empty() {
-                    crate::repository::insert_events_to_db(self.connection_pool().clone(), events).await?;
+                    crate::repository::insert_events_to_db(self.connection_pool().clone(), events)
+                        .await?;
                 }
             }
             ProcessorOutput::Tx(txs) => {
                 if !txs.is_empty() {
-                    crate::repository::insert_txs_to_db(self.connection_pool().clone(), txs).await?;
+                    crate::repository::insert_txs_to_db(self.connection_pool().clone(), txs)
+                        .await?;
                 }
             }
             ProcessorOutput::Custom(_) => {

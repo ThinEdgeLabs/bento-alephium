@@ -61,5 +61,4 @@ impl ProcessorTrait for EventProcessor {
         }
         Ok(ProcessorOutput::Event(models))
     }
-
 }
