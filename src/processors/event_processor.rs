@@ -5,10 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::{
-    config::ProcessorConfig,
-    db::DbPool,
-    models::convert_bwe_to_event_models,
-    types::BlockAndEvents,
+    config::ProcessorConfig, db::DbPool, models::convert_bwe_to_event_models, types::BlockAndEvents,
 };
 
 use super::{ProcessorOutput, ProcessorTrait};

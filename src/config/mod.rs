@@ -17,13 +17,13 @@ pub enum ProcessorConfig {
     BlockProcessor,
     EventProcessor,
     TxProcessor,
-    
+
     /// Custom processors with arguments
     Custom {
         name: String,
         factory: ProcessorFactory,
         args: Option<serde_json::Value>,
-    }
+    },
 }
 
 impl ProcessorConfig {
@@ -35,35 +35,29 @@ impl ProcessorConfig {
             ProcessorConfig::Custom { name, .. } => name,
         }
     }
-    
+
     /// Create a new custom processor config
     pub fn custom<S: Into<String>>(
-        name: S, 
+        name: S,
         factory: ProcessorFactory,
         args: Option<serde_json::Value>,
     ) -> Self {
-        Self::Custom {
-            name: name.into(),
-            factory,
-            args,
-        }
+        Self::Custom { name: name.into(), factory, args }
     }
-    
+
     /// Build a processor from this config
     pub fn build_processor(&self, db_pool: Arc<DbPool>) -> DynProcessor {
         match self {
-            ProcessorConfig::BlockProcessor => {
-                crate::processors::new_processor(crate::processors::block_processor::BlockProcessor::new(db_pool))
-            }
-            ProcessorConfig::EventProcessor => {
-                crate::processors::new_processor(crate::processors::event_processor::EventProcessor::new(db_pool))
-            }
-            ProcessorConfig::TxProcessor => {
-                crate::processors::new_processor(crate::processors::tx_processor::TxProcessor::new(db_pool))
-            }
-            ProcessorConfig::Custom { factory, args, .. } => {
-                factory(db_pool, args.clone())
-            }
+            ProcessorConfig::BlockProcessor => crate::processors::new_processor(
+                crate::processors::block_processor::BlockProcessor::new(db_pool),
+            ),
+            ProcessorConfig::EventProcessor => crate::processors::new_processor(
+                crate::processors::event_processor::EventProcessor::new(db_pool),
+            ),
+            ProcessorConfig::TxProcessor => crate::processors::new_processor(
+                crate::processors::tx_processor::TxProcessor::new(db_pool),
+            ),
+            ProcessorConfig::Custom { factory, args, .. } => factory(db_pool, args.clone()),
         }
     }
 }

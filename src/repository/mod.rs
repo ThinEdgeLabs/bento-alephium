@@ -1,7 +1,7 @@
 pub mod block;
 pub mod event;
-pub mod transaction;
 pub mod processor_status;
+pub mod transaction;
 use std::sync::Arc;
 
 pub use block::*;

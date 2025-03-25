@@ -6,15 +6,13 @@ use crate::{
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
     processors::{
-        block_processor::BlockProcessor, event_processor::EventProcessor,
-        new_processor,
+        block_processor::BlockProcessor, event_processor::EventProcessor, new_processor,
         tx_processor::TxProcessor, DynProcessor, ProcessorOutput,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
 };
 
 use anyhow::{Context, Result};
-
 
 use crate::traits::StageHandler;
 use std::{sync::Arc, time::Duration};
@@ -286,7 +284,6 @@ impl Worker {
         run_pending_migrations(&mut conn);
     }
 }
-
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {
