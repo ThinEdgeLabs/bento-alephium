@@ -296,8 +296,6 @@ fn handle_loan_action_event(
     event: &ContractEventByBlockHash,
     action: LoanActionType,
 ) {
-    // Your existing implementation...
-    // Sanity check
     if event.fields.len() < 3 {
         tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
     }
@@ -331,8 +329,6 @@ fn handle_loan_action_event(
 }
 
 fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<LoanDetailModel>) {
-    // Your existing implementation...
-    // Sanity check
     if event.fields.len() != 8 {
         tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
     }
