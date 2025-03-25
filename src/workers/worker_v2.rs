@@ -1,3 +1,4 @@
+use crate::repository::processor_status::{get_last_timestamp, update_last_timestamp};
 use crate::types::FetchStrategy;
 use crate::types::{BlockBatch, BlockRange, StageMessage};
 use crate::{
@@ -10,12 +11,10 @@ use crate::{
         tx_processor::TxProcessor, DynProcessor, ProcessorOutput,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
-    schema::processor_status,
 };
 
 use anyhow::{Context, Result};
-use diesel::{insert_into, ExpressionMethods, OptionalExtension, QueryDsl};
-use diesel_async::RunQueryDsl;
+
 
 use crate::traits::StageHandler;
 use std::{sync::Arc, time::Duration};
@@ -288,43 +287,6 @@ impl Worker {
         let mut conn = PgConnection::establish(&self.db_url).expect("migrations failed!");
         run_pending_migrations(&mut conn);
     }
-}
-
-pub async fn get_last_timestamp(db_pool: &Arc<DbPool>, processor_name: &str) -> Result<i64> {
-    tracing::info!(processor = processor_name, "Getting last timestamp");
-    let mut conn = db_pool.get().await?;
-    let ts = processor_status::table
-        .filter(processor_status::processor.eq(processor_name))
-        .select(processor_status::last_timestamp)
-        .first::<i64>(&mut conn)
-        .await
-        .optional()?;
-    Ok(ts.unwrap_or(0))
-}
-
-pub async fn update_last_timestamp(
-    _db_pool: &Arc<DbPool>,
-    processor_name: &str,
-    last_timestamp: i64,
-) -> Result<()> {
-    tracing::info!(
-        processor = processor_name,
-        last_timestamp = last_timestamp,
-        "Updating last timestamp"
-    );
-    let mut conn = _db_pool.get().await?;
-    insert_into(processor_status::table)
-        .values((
-            processor_status::processor.eq(processor_name),
-            processor_status::last_timestamp.eq(last_timestamp),
-        ))
-        .on_conflict(processor_status::processor)
-        .do_update()
-        .set(processor_status::last_timestamp.eq(last_timestamp))
-        .execute(&mut conn)
-        .await
-        .map(|_| ())
-        .map_err(anyhow::Error::new)
 }
 
 /// Build a processor based on the configuration.
