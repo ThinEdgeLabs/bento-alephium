@@ -36,8 +36,6 @@ impl Debug for TxProcessor {
 
 #[async_trait]
 impl ProcessorTrait for TxProcessor {
-    type Output = ProcessorOutput;
-
     fn name(&self) -> &'static str {
         ProcessorConfig::TxProcessor.name()
     }
@@ -51,7 +49,7 @@ impl ProcessorTrait for TxProcessor {
         _from: i64,
         _to: i64,
         blocks: Vec<BlockAndEvents>,
-    ) -> Result<Self::Output> {
+    ) -> Result<ProcessorOutput> {
         let models = convert_bwe_to_tx_models(blocks);
         //
 
@@ -64,9 +62,5 @@ impl ProcessorTrait for TxProcessor {
         //     insert_txs_to_db(self.connection_pool.clone(), models).await?;
         // }
         Ok(ProcessorOutput::Tx(models))
-    }
-
-    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        output
     }
 }

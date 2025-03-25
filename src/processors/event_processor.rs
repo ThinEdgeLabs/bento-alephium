@@ -36,8 +36,6 @@ impl Debug for EventProcessor {
 
 #[async_trait]
 impl ProcessorTrait for EventProcessor {
-    type Output = ProcessorOutput;
-
     fn name(&self) -> &'static str {
         ProcessorConfig::EventProcessor.name()
     }
@@ -51,7 +49,7 @@ impl ProcessorTrait for EventProcessor {
         _from: i64,
         _to: i64,
         blocks: Vec<BlockAndEvents>,
-    ) -> Result<Self::Output> {
+    ) -> Result<ProcessorOutput> {
         // Process events and insert to db
         let models = convert_bwe_to_event_models(blocks);
         if !models.is_empty() {
@@ -64,7 +62,4 @@ impl ProcessorTrait for EventProcessor {
         Ok(ProcessorOutput::Event(models))
     }
 
-    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        output
-    }
 }

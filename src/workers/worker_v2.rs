@@ -12,7 +12,7 @@ use crate::{
         },
         tx_processor::TxProcessor,
         new_processor,
-        Processor, ProcessorOutput,
+        ProcessorOutput,
         DynProcessor,
     },
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
@@ -24,7 +24,6 @@ use diesel::{insert_into, ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;
 
 use crate::traits::StageHandler;
-use std::time::Instant;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time::sleep as tokio_sleep};
 

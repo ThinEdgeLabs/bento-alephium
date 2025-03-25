@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::config::ProcessorConfig;
-use crate::processors::ProcessorTrait;
+use crate::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
 use crate::types::ContractEventByBlockHash;
 use crate::utils::timestamp_millis_to_naive_datetime;
 use crate::{db::DbPool, types::BlockAndEvents};
@@ -19,8 +19,6 @@ use diesel_enum::DbEnum;
 use serde::Serialize;
 
 use diesel::FromSqlRow;
-
-use super::{CustomProcessorOutput, ProcessorOutput};
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
 #[diesel(table_name = crate::schema::loan_actions)]
@@ -69,7 +67,11 @@ impl Debug for LendingContractProcessor {
     }
 }
 
-type LendingContractOutput = (Vec<LoanActionModel>, Vec<LoanDetailModel>);
+#[derive(Debug, Clone)]
+pub struct LendingContractOutput {
+    pub loan_actions: Vec<LoanActionModel>,
+    pub loan_details: Vec<LoanDetailModel>,
+}
 
 impl CustomProcessorOutput for LendingContractOutput {
     fn as_any(&self) -> &dyn std::any::Any {
@@ -83,10 +85,8 @@ impl CustomProcessorOutput for LendingContractOutput {
 
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
-    type Output = ProcessorOutput;
-
     fn name(&self) -> &'static str {
-        ProcessorConfig::LendingContractProcessor("".into()).name()
+        "lending_contract_processor"
     }
 
     fn connection_pool(&self) -> &Arc<DbPool> {
@@ -98,21 +98,55 @@ impl ProcessorTrait for LendingContractProcessor {
         _from: i64,
         _to: i64,
         blocks: Vec<BlockAndEvents>,
-    ) -> Result<Self::Output> {
-        // Process blocks and insert to db
+    ) -> Result<ProcessorOutput> {
+        // Process blocks and convert to models
         let (loan_actions, loan_details) = convert_to_model(blocks, &self.contract_address);
-        // if !loan_actions.is_empty() {
-        //     insert_loan_actions_to_db(self.connection_pool.clone(), loan_actions).await?;
-        // }
-        // if !loan_details.is_empty() {
-        //     insert_loan_details_to_db(self.connection_pool.clone(), loan_details).await?;
-        // }
-        // Ok(loan_actions.into_iter().zip(loan_details.into_iter()).collect())
-        Ok(ProcessorOutput::Custom(Arc::new((loan_actions, loan_details))))
+        
+        tracing::info!(
+            "Processed {} loan actions and {} loan details",
+            loan_actions.len(),
+            loan_details.len()
+        );
+        
+        // Return custom output
+        Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput {
+            loan_actions,
+            loan_details,
+        })))
     }
-
-    fn wrap_output(&self, output: Self::Output) -> ProcessorOutput {
-        output
+    
+    // Override storage method to handle our custom output
+    async fn store_output(&self, output: ProcessorOutput) -> Result<()> {
+        if let ProcessorOutput::Custom(custom) = output {
+            // Downcast to our specific output type
+            if let Some(lending_output) = custom.as_any().downcast_ref::<LendingContractOutput>() {
+                let loan_actions = &lending_output.loan_actions;
+                let loan_details = &lending_output.loan_details;
+                
+                // Store loan actions
+                if !loan_actions.is_empty() {
+                    insert_loan_actions_to_db(self.connection_pool.clone(), loan_actions.clone()).await?;
+                }
+                
+                // Store loan details
+                if !loan_details.is_empty() {
+                    insert_loan_details_to_db(self.connection_pool.clone(), loan_details.clone()).await?;
+                }
+                
+                tracing::info!(
+                    "Stored {} loan actions and {} loan details",
+                    loan_actions.len(),
+                    loan_details.len()
+                );
+            } else {
+                return Err(anyhow::anyhow!("Invalid custom output type"));
+            }
+        } else {
+            // This should not happen as we only return Custom output
+            return Err(anyhow::anyhow!("Expected Custom output type"));
+        }
+        
+        Ok(())
     }
 }
 
@@ -136,10 +170,12 @@ pub async fn insert_loan_details_to_db(
     Ok(())
 }
 
+// The rest of your implementation remains the same
 pub fn convert_to_model(
     blocks: Vec<BlockAndEvents>,
     contract_address: &str,
 ) -> (Vec<LoanActionModel>, Vec<LoanDetailModel>) {
+    // Your existing implementation...
     let mut loan_actions = Vec::new();
     let mut loan_details = Vec::new();
     for be in blocks {
@@ -210,6 +246,7 @@ fn handle_loan_action_event(
     event: &ContractEventByBlockHash,
     action: LoanActionType,
 ) {
+    // Your existing implementation...
     // Sanity check
     if event.fields.len() < 3 {
         tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
@@ -219,7 +256,6 @@ fn handle_loan_action_event(
         LoanActionType::LoanCreated => {
             models.push(LoanActionModel {
                 loan_subcontract_id: event.fields[0].value.clone().to_string(),
-
                 action_type: action,
                 by: event.fields[2].value.clone().to_string(),
                 timestamp: timestamp_millis_to_naive_datetime(
@@ -245,6 +281,7 @@ fn handle_loan_action_event(
 }
 
 fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<LoanDetailModel>) {
+    // Your existing implementation...
     // Sanity check
     if event.fields.len() != 8 {
         tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
@@ -261,3 +298,5 @@ fn handle_loan_detail_event(event: &ContractEventByBlockHash, models: &mut Vec<L
         lender: event.fields[7].value.clone().to_string(),
     });
 }
+
+
