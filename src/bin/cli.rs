@@ -10,12 +10,9 @@ use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::fs;
-use std::collections::HashMap;
 use std::io::Read;
 use regex::Regex;
 
-// Import all potential processor modules
-mod lending_example;
 // Add additional processor modules here
 
 /// CLI tool for managing the Alephium indexer
@@ -185,21 +182,21 @@ impl FactoryRegistry {
     }
 }
 
-// Function to create a lending processor
-fn create_lending_processor(pool: Arc<DbPool>, args: Option<serde_json::Value>) -> Box<dyn ProcessorTrait> {
-    let contract_address = match args {
-        Some(v) => match v.get("contract_address") {
-            Some(addr) => match addr.as_str() {
-                Some(s) => s.to_string(),
-                None => panic!("Contract address must be a string")
-            },
-            None => panic!("Contract address is required")
-        },
-        None => panic!("Args is required for custom processor")
-    };
+// // Function to create a lending processor
+// fn create_lending_processor(pool: Arc<DbPool>, args: Option<serde_json::Value>) -> Box<dyn ProcessorTrait> {
+//     let contract_address = match args {
+//         Some(v) => match v.get("contract_address") {
+//             Some(addr) => match addr.as_str() {
+//                 Some(s) => s.to_string(),
+//                 None => panic!("Contract address must be a string")
+//             },
+//             None => panic!("Contract address is required")
+//         },
+//         None => panic!("Args is required for custom processor")
+//     };
     
-    Box::new(lending_example::LendingContractProcessor::new(pool, contract_address))
-}
+//     Box::new(lending_example::LendingContractProcessor::new(pool, contract_address))
+// }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
