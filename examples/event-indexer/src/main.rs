@@ -1,4 +1,4 @@
-use bento_alephium::{
+use bento_core::{
     client::Network,
     config::ProcessorConfig,
     workers::worker_v2::{SyncOptions, Worker},
@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::TxProcessor;
+    let processor_config = ProcessorConfig::EventProcessor;
 
     let worker = Worker::new(
         vec![processor_config],

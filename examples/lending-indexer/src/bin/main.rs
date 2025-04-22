@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use bento_alephium::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
-use bento_alephium::types::ContractEventByBlockHash;
-use bento_alephium::utils::timestamp_millis_to_naive_datetime;
-use bento_alephium::{db::DbPool, types::BlockAndEvents};
+use bento_core::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
+use bento_core::types::ContractEventByBlockHash;
+use bento_core::utils::timestamp_millis_to_naive_datetime;
+use bento_core::{db::DbPool, types::BlockAndEvents};
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::NaiveDateTime;
 use diesel::expression::AsExpression;
@@ -22,17 +22,19 @@ use diesel::FromSqlRow;
 
 use std::vec;
 
-use bento_alephium::types::FetchStrategy;
-use bento_alephium::{
+use crate::cli;
+
+use bento_core::types::FetchStrategy;
+use bento_core::{
     client::Network,
     config::ProcessorConfig,
     workers::worker_v2::{SyncOptions, Worker},
 };
 
-fn register_lending_contract(
+pub fn register_lending_contract(
     pool: Arc<DbPool>,
     args: Option<serde_json::Value>,
-) -> Box<dyn bento_alephium::processors::ProcessorTrait> {
+) -> Box<dyn bento_core::processors::ProcessorTrait> {
     let contract_address = if let Some(args) = args {
         args.get("contract_address").and_then(|v| v.as_str()).unwrap().to_string()
     } else {
@@ -77,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = bento_alephium::schema::loan_actions)]
+#[diesel(table_name = bento_core::schema::loan_actions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanActionModel {
     loan_subcontract_id: String,
@@ -88,7 +90,7 @@ pub struct LoanActionModel {
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = bento_alephium::schema::loan_details)]
+#[diesel(table_name = bento_core::schema::loan_details)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanDetailModel {
     loan_subcontract_id: String,
@@ -211,7 +213,7 @@ pub async fn insert_loan_actions_to_db(
     actions: Vec<LoanActionModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(bento_alephium::schema::loan_actions::table)
+    insert_into(bento_core::schema::loan_actions::table)
         .values(&actions)
         .execute(&mut conn)
         .await?;
@@ -224,7 +226,7 @@ pub async fn insert_loan_details_to_db(
     details: Vec<LoanDetailModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(bento_alephium::schema::loan_details::table)
+    insert_into(bento_core::schema::loan_details::table)
         .values(&details)
         .execute(&mut conn)
         .await?;

@@ -5,14 +5,11 @@ use crate::{
     client::{Client, Network},
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
-    processors::{
-        block_processor::BlockProcessor, event_processor::EventProcessor, new_processor,
-        tx_processor::TxProcessor, DynProcessor, ProcessorOutput,
-    },
+    processors::{DynProcessor, ProcessorOutput},
     repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
 };
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::traits::StageHandler;
 use std::{sync::Arc, time::Duration};
