@@ -3,10 +3,11 @@ pub mod types;
 
 use anyhow::{Context, Result};
 use bento_core::{
-    client::Network, config::ProcessorConfig, workers::worker_v2::Worker, ProcessorFactory,
+    client::Network, config::ProcessorConfig, new_db_pool, workers::worker_v2::Worker,
+    ProcessorFactory,
 };
+use bento_server::{start, Config as ServerConfig};
 use std::{fs, path::Path};
-
 pub fn config_from_args(args: &CliArgs) -> Result<Config> {
     let config_path = args.config_path.clone();
     let config_str = std::fs::read_to_string(config_path)?;
@@ -64,14 +65,25 @@ pub async fn run_worker(args: CliArgs, factory: ProcessorFactory) -> Result<()> 
     Ok(())
 }
 
-pub async fn new_server_from_args(args: &CliArgs) -> Result<()> {
-    // Server implementation would go here
-    Ok(())
+pub async fn new_server_from_args(args: &CliArgs) -> Result<ServerConfig> {
+    // Load config from args
+    let config = config_from_args(args)?;
+    let db_pool = new_db_pool(&config.worker.database_url, None).await?;
+    let server_config = ServerConfig {
+        db_client: db_pool,
+        api_host: "localhost".into(),
+        api_port: config.server.port.parse()?,
+    };
+    Ok(server_config)
 }
 
 pub async fn run_server(args: CliArgs) -> Result<()> {
-    println!("🟢 Running server with config: {}", args.config_path);
-    // Add your async server logic here
+    dotenvy::dotenv().ok();
+    println!("Starting server...");
+    let config = new_server_from_args(&args).await?;
+    println!("Server is ready and running on http://{}", config.api_endpoint());
+    println!("Swagger UI is available at http://{}/swagger-ui", config.api_endpoint());
+    start(config).await?;
     Ok(())
 }
 

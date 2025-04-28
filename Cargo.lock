@@ -452,8 +452,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bento-core",
+ "bento-server",
  "clap",
  "dotenv",
+ "dotenvy",
  "serde",
  "serde_json",
  "tokio",
@@ -519,7 +521,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "bento-cli",
  "bento-types",
  "diesel",
  "serde",

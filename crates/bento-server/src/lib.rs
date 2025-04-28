@@ -10,7 +10,7 @@ use utoipa_swagger_ui::SwaggerUi;
 pub mod error;
 pub mod handler;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     pub db_client: Arc<DbPool>,
     pub api_host: String,

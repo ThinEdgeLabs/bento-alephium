@@ -7,6 +7,8 @@ version.workspace = true
 
 [dependencies]
 bento-core = { path = "../../crates/bento-core" }
+bento-server = { path = "../../crates/bento-server" }
+
 anyhow.workspace = true
 clap.workspace = true
 dotenv.workspace = true
@@ -14,3 +16,4 @@ serde.workspace = true
 toml.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
+dotenvy.workspace = true
