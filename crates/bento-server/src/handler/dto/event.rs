@@ -2,7 +2,7 @@ use bento_types::EventModel;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::api::Pagination;
+use crate::Pagination;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventDto {

@@ -3,11 +3,11 @@ use axum::Json;
 use bento_types::repository::{get_events, get_events_by_contract, get_events_by_tx};
 use bento_types::EventModel;
 
-use crate::api::error::AppError;
-use crate::api::handler::dto::event::EventByContractQuery;
-use crate::api::handler::dto::EventsQuery;
-use crate::api::AppState;
-use crate::api::Pagination;
+use crate::error::AppError;
+use crate::handler::dto::event::EventByContractQuery;
+use crate::handler::dto::EventsQuery;
+use crate::AppState;
+use crate::Pagination;
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -15,7 +15,7 @@ use super::dto::{EventByTxIdQuery, EventDto};
 pub struct EventApiModule;
 
 impl EventApiModule {
-    pub fn register() -> OpenApiRouter<crate::api::AppState> {
+    pub fn register() -> OpenApiRouter<crate::AppState> {
         OpenApiRouter::new()
             .routes(routes!(get_events_handler))
             .routes(routes!(get_events_by_contract_handler))

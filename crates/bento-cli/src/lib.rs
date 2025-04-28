@@ -3,10 +3,7 @@ pub mod types;
 
 use anyhow::{Context, Result};
 use bento_core::{
-    client::Network,
-    config::ProcessorConfig,
-    workers::worker_v2::Worker,
-    ProcessorFactory,
+    client::Network, config::ProcessorConfig, workers::worker_v2::Worker, ProcessorFactory,
 };
 use std::{fs, path::Path};
 
@@ -28,7 +25,7 @@ pub async fn new_worker_from_config(config: &Config, factory: ProcessorFactory) 
     if let Some(lending_config) = &config.processors.lending {
         let processor_config = ProcessorConfig::Custom {
             name: lending_config.name.clone(),
-            factory: factory.clone(),
+            factory,
             args: Some(serde_json::json!({"contract_address": lending_config.contract_address})),
         };
         processors.push(processor_config);

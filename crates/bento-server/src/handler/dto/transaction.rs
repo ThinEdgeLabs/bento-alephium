@@ -2,7 +2,7 @@ use bento_types::TransactionModel;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::api::Pagination;
+use crate::Pagination;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TransactionDto {

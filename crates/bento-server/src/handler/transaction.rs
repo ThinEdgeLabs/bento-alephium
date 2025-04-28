@@ -2,19 +2,19 @@ use axum::extract::{Query, State};
 use axum::Json;
 use bento_types::repository::{get_tx_by_hash, get_txs, get_txs_by_block};
 
-use crate::api::error::AppError;
-use crate::api::handler::dto::{
+use crate::error::AppError;
+use crate::handler::dto::{
     TransactionBlockQuery, TransactionDto, TransactionHashQuery, TransactionsQuery,
 };
-use crate::api::AppState;
-use crate::api::Pagination;
+use crate::AppState;
+use crate::Pagination;
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub struct TransactionApiModule;
 
 impl TransactionApiModule {
-    pub fn register() -> OpenApiRouter<crate::api::AppState> {
+    pub fn register() -> OpenApiRouter<crate::AppState> {
         OpenApiRouter::new()
             .routes(routes!(get_txs_handler))
             .routes(routes!(get_tx_by_hash_handler))

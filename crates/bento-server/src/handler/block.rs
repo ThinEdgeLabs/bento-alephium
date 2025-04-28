@@ -4,10 +4,10 @@ use bento_types::repository::{
     get_block_by_hash, get_block_by_height, get_block_transactions, get_blocks,
 };
 
-use crate::api::error::AppError;
-use crate::api::handler::dto::{BlockByHeightQuery, TransactionDto};
-use crate::api::handler::dto::{BlockDto, BlocksQuery};
-use crate::api::AppState;
+use crate::error::AppError;
+use crate::handler::dto::{BlockByHeightQuery, TransactionDto};
+use crate::handler::dto::{BlockDto, BlocksQuery};
+use crate::AppState;
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -15,7 +15,7 @@ use super::dto::BlockByHashQuery;
 pub struct BlockApiModule;
 
 impl BlockApiModule {
-    pub fn register() -> OpenApiRouter<crate::api::AppState> {
+    pub fn register() -> OpenApiRouter<crate::AppState> {
         OpenApiRouter::new()
             .routes(routes!(get_blocks_handler))
             .routes(routes!(get_block_by_hash_handler))

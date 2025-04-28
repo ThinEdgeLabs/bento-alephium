@@ -514,6 +514,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bento-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "bento-cli",
+ "bento-types",
+ "diesel",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
+]
+
+[[package]]
 name = "bento-trait"
 version = "0.1.0"
 dependencies = [
@@ -535,13 +554,18 @@ dependencies = [
  "chrono",
  "diesel",
  "diesel-async",
+ "diesel_migrations",
+ "futures-util",
+ "native-tls",
  "postgres-native-tls",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
+ "tokio-postgres",
  "tracing",
  "tracing-subscriber",
+ "url",
  "utoipa",
  "uuid",
 ]

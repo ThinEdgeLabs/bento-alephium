@@ -1,6 +1,6 @@
-use crate::{db::DbPool, Config};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::routing::get;
+use bento_types::{db::new_db_pool, DbPool};
 use handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -9,6 +9,30 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 pub mod error;
 pub mod handler;
+
+#[derive(Clone)]
+pub struct Config {
+    pub db_client: Arc<DbPool>,
+    pub api_host: String,
+    pub api_port: u16,
+}
+
+impl Config {
+    pub async fn from_env() -> Result<Self> {
+        let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let db_client =
+            new_db_pool(&db_url, None).await.context("Failed to create connection pool")?;
+
+        let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
+        let port = std::env::var("PORT").unwrap_or("3000".to_string());
+
+        Ok(Self { db_client, api_host: host, api_port: port.parse().unwrap() })
+    }
+
+    pub fn api_endpoint(&self) -> String {
+        format!("{}:{}", self.api_host, self.api_port)
+    }
+}
 
 #[derive(Clone)]
 pub struct AppState {
