@@ -42,9 +42,9 @@ pub struct BackfillStatusArgs {
     pub processor_name: String,
 }
 
-impl Into<CliArgs> for BackfillStatusArgs {
-    fn into(self) -> CliArgs {
-        CliArgs { config_path: self.config_path }
+impl From<BackfillStatusArgs> for CliArgs {
+    fn from(value: BackfillStatusArgs) -> Self {
+        Self { config_path: value.config_path }
     }
 }
 
