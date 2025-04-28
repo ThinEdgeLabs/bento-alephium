@@ -100,7 +100,7 @@ impl CustomProcessorOutput for LendingContractOutput {
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
     fn name(&self) -> &'static str {
-        "lending_contract_processor"
+        "lending_processor"
     }
 
     fn connection_pool(&self) -> &Arc<DbPool> {

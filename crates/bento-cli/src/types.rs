@@ -19,13 +19,33 @@ pub enum RunMode {
     Server(CliArgs),
     Worker(CliArgs),
     Backfill(CliArgs),
+    BackfillStatus(BackfillStatusArgs),
 }
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct CliArgs {
     /// Path to the config file
-    #[arg(short, long)]
+    #[arg(short, long, default_value = "config.toml")]
     pub config_path: String,
+}
+
+#[derive(Args, Clone)]
+
+pub struct BackfillStatusArgs {
+    /// Path to the config file
+    #[arg(short, long, default_value = "config.toml")]
+    pub config_path: String,
+
+    /// The processor name to check the backfill status for
+    /// This is a required argument
+    #[arg(short, long)]
+    pub processor_name: String,
+}
+
+impl Into<CliArgs> for BackfillStatusArgs {
+    fn into(self) -> CliArgs {
+        CliArgs { config_path: self.config_path }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

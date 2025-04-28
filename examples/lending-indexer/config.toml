@@ -18,5 +18,5 @@ start = 1716560632750
 end = 1716560632750
 
 [processors.lending]
-name = "Lending Processor"
+name = "lending_processor"
 contract_address = "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"

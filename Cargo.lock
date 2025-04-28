@@ -453,6 +453,7 @@ dependencies = [
  "anyhow",
  "bento-core",
  "bento-server",
+ "bento-types",
  "clap",
  "dotenv",
  "dotenvy",

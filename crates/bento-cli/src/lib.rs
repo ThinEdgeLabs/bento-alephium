@@ -1,5 +1,6 @@
 use crate::types::*;
 pub mod types;
+use bento_types::repository::processor_status::get_last_timestamp;
 use clap::Parser;
 
 use anyhow::{Context, Result};
@@ -112,6 +113,33 @@ pub async fn run_command(factory: ProcessorFactory) -> Result<()> {
             RunMode::Server(args) => run_server(args).await?,
             RunMode::Worker(args) => run_worker(args, factory).await?,
             RunMode::Backfill(args) => run_backfill(args, factory).await?,
+            RunMode::BackfillStatus(args) => {
+                if args.processor_name.is_empty() {
+                    return Err(anyhow::anyhow!("Processor name is required for backfill status"));
+                }
+                let config = config_from_args(&args.clone().into())?;
+
+                let worker = new_worker_from_config(&config, factory).await?;
+
+                worker.processor_configs.iter().for_each(|p| {
+                    println!("Processor: {}", p.name());
+                });
+
+                let processor = worker
+                    .processor_configs
+                    .iter()
+                    .find(|p| p.name() == args.processor_name)
+                    .ok_or_else(|| anyhow::anyhow!("Processor not found"))?;
+
+                let backfill_height = get_last_timestamp(&worker.db_pool, processor.name())
+                    .await
+                    .context("Failed to get last timestamp")?;
+
+                println!(
+                    "Backfill status for processor {}: last timestamp = {}",
+                    args.processor_name, backfill_height
+                );
+            }
         },
     }
     Ok(())
