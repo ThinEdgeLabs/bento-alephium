@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Run(run) => match run.mode {
             RunMode::Server(args) => run_server(args).await?,
             RunMode::Worker(args) => run_worker(args, processor_factory()).await?,
-            RunMode::Backfill(args) => run_backfill(args).await?,
+            RunMode::Backfill(args) => run_backfill(args, processor_factory()).await?,
         },
     }
 

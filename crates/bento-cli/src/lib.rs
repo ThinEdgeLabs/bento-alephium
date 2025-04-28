@@ -87,12 +87,22 @@ pub async fn run_server(args: CliArgs) -> Result<()> {
     Ok(())
 }
 
-pub async fn run_backfill(args: CliArgs) -> Result<()> {
-    println!("📦 Running backfill with config: {}", args.config_path);
-    // Add your async backfill logic here
+pub async fn run_backfill(args: CliArgs, factory: ProcessorFactory) -> Result<()> {
+    println!("⚙️  Running backfilling with config: {}", args.config_path);
+    tracing_subscriber::fmt::init();
+
+    // Load config from args
+    let config = config_from_args(&args)?;
+
+    // Create worker from config
+    let worker = new_worker_from_config(&config, factory).await?;
+
+    // Run the worker
+    println!("🚀 Starting worker...");
+    worker.run().await?;
+
     Ok(())
 }
-
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
     let content = fs::read_to_string(path).context("Failed to read config file")?;
     let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
