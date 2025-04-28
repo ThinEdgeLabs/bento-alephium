@@ -1,17 +1,20 @@
-use crate::repository::processor_status::{get_last_timestamp, update_last_timestamp};
-use crate::types::FetchStrategy;
-use crate::types::{BlockBatch, BlockRange, StageMessage};
 use crate::{
     client::{Client, Network},
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
-    processors::{DynProcessor, ProcessorOutput},
-    repository::{insert_blocks_to_db, insert_events_to_db, insert_txs_to_db},
+};
+use bento_trait::{processor::DynProcessor, stage::StageHandler};
+use bento_types::{
+    processors::ProcessorOutput,
+    repository::{
+        insert_blocks_to_db, insert_events_to_db, insert_txs_to_db,
+        processor_status::{get_last_timestamp, update_last_timestamp},
+    },
+    BlockBatch, BlockRange, FetchStrategy, StageMessage,
 };
 
 use anyhow::Result;
 
-use crate::traits::StageHandler;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time::sleep as tokio_sleep};
 
@@ -220,14 +223,18 @@ impl Worker {
                 let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
 
                 let last_ts = get_last_timestamp(&pool_clone, processor_name).await?;
-                let mut current_ts = sync_opts_clone.start_ts.unwrap_or(0).max(last_ts);
+                let mut current_ts =
+                    sync_opts_clone.start_ts.unwrap_or(0).max(last_ts.try_into().unwrap());
                 let step = sync_opts_clone.step.unwrap_or(1000);
                 let sync_duration =
                     Duration::from_secs(sync_opts_clone.sync_duration.unwrap_or(1) as u64);
 
                 loop {
                     let to_ts = current_ts + step;
-                    let range = BlockRange { from_ts: current_ts, to_ts };
+                    let range = BlockRange {
+                        from_ts: current_ts.try_into().unwrap(),
+                        to_ts: to_ts.try_into().unwrap(),
+                    };
                     let batches = fetch_parallel(
                         client_clone.clone(),
                         range,
@@ -242,7 +249,12 @@ impl Worker {
                             sync_duration
                         );
                     } else {
-                        update_last_timestamp(&pool_clone, processor_name, to_ts).await?;
+                        update_last_timestamp(
+                            &pool_clone,
+                            processor_name,
+                            to_ts.try_into().unwrap(),
+                        )
+                        .await?;
                         current_ts = to_ts + 1;
                     }
 
@@ -284,8 +296,8 @@ impl Worker {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {
-    pub start_ts: Option<i64>,
-    pub step: Option<i64>,
-    pub back_step: Option<i64>,
-    pub sync_duration: Option<i64>,
+    pub start_ts: Option<u64>,
+    pub step: Option<u64>,
+    pub back_step: Option<u64>,
+    pub sync_duration: Option<u64>,
 }

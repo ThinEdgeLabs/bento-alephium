@@ -1,13 +1,13 @@
-use crate::types::BlockAndEvents;
+use crate::BlockAndEvents;
 
 pub mod block;
 pub mod event;
 pub mod processor_status;
 pub mod transaction;
 
-use block::BlockModel;
-use event::EventModel;
-use transaction::TransactionModel;
+pub use block::BlockModel;
+pub use event::EventModel;
+pub use transaction::TransactionModel;
 
 pub fn convert_bwe_to_block_models(blocks: Vec<BlockAndEvents>) -> Vec<BlockModel> {
     let mut models = Vec::new();

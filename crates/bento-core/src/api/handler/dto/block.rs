@@ -1,7 +1,8 @@
+use bento_types::{BlockModel, Order};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{api::Pagination, models::block::BlockModel, types::Order};
+use crate::api::Pagination;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct BlockDto {

@@ -3,9 +3,10 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use bento_types::BlockHash;
 use serde_json::json;
 use std::fmt;
+
+use crate::BlockHash;
 
 // Define custom error types
 #[derive(Debug)]

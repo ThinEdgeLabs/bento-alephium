@@ -9,10 +9,9 @@ pub use event::*;
 pub use transaction::*;
 
 use crate::{
-    api::error::RepositoryError,
-    db::DbPool,
+    errors::api::RepositoryError,
     models::{block::BlockModel, event::EventModel, transaction::TransactionModel},
-    types::BlockHash,
+    BlockHash, DbPool,
 };
 use anyhow::Ok;
 use anyhow::Result;

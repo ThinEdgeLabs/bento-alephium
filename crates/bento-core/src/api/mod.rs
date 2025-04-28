@@ -1,10 +1,12 @@
 use crate::{db::DbPool, Config};
+use anyhow::Result;
+use axum::routing::get;
 use handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use utoipa::ToSchema;
+use utoipa::{openapi::Info, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
-
+use utoipa_swagger_ui::SwaggerUi;
 pub mod error;
 pub mod handler;
 

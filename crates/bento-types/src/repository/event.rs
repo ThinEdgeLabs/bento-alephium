@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::{db::DbPool, models::event::EventModel};
+use crate::{models::event::EventModel, DbPool};
 use anyhow::Result;
 use diesel::insert_into;
 use diesel::prelude::*;

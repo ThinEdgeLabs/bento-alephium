@@ -4,12 +4,17 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use bento_core::processors::{CustomProcessorOutput, ProcessorOutput, ProcessorTrait};
-use bento_core::types::ContractEventByBlockHash;
-use bento_core::utils::timestamp_millis_to_naive_datetime;
-use bento_core::{db::DbPool, types::BlockAndEvents};
+use bento_core::ProcessorFactory;
+use bento_core::db::DbPool;
+use bento_trait::processor::ProcessorTrait;
+use bento_types::BlockAndEvents;
+use bento_types::ContractEventByBlockHash;
+use bento_types::CustomProcessorOutput;
+use bento_types::processors::ProcessorOutput;
+use bento_types::utils::timestamp_millis_to_naive_datetime;
 use bigdecimal::{BigDecimal, FromPrimitive};
 use chrono::NaiveDateTime;
+use diesel::FromSqlRow;
 use diesel::expression::AsExpression;
 use diesel::insert_into;
 use diesel::prelude::*;
@@ -18,68 +23,42 @@ use diesel_async::RunQueryDsl;
 use diesel_enum::DbEnum;
 use serde::Serialize;
 
-use diesel::FromSqlRow;
-
 use std::vec;
 
-use crate::cli;
+use bento_cli::*;
 
-use bento_core::types::FetchStrategy;
 use bento_core::{
     client::Network,
     config::ProcessorConfig,
     workers::worker_v2::{SyncOptions, Worker},
 };
 
-pub fn register_lending_contract(
-    pool: Arc<DbPool>,
-    args: Option<serde_json::Value>,
-) -> Box<dyn bento_core::processors::ProcessorTrait> {
-    let contract_address = if let Some(args) = args {
-        args.get("contract_address").and_then(|v| v.as_str()).unwrap().to_string()
-    } else {
-        panic!("Missing contract address argument")
-    };
-
-    Box::new(LendingContractProcessor::new(pool, contract_address))
+fn processor_factory() -> ProcessorFactory {
+    |db_pool, args: Option<serde_json::Value>| {
+        Box::new(LendingContractProcessor::new(db_pool, args.unwrap_or_default()))
+    }
 }
+
+use bento_cli::types::*;
+use clap::Parser;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load .env file
-    dotenvy::dotenv().ok();
+async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
 
-    // Setup logger
-    tracing_subscriber::fmt().init();
+    match cli.command {
+        Commands::Run(run) => match run.mode {
+            RunMode::Server(args) => run_server(args).await?,
+            RunMode::Worker(args) => run_worker(args, processor_factory()).await?,
+            RunMode::Backfill(args) => run_backfill(args).await?,
+        },
+    }
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::Custom {
-        name: "lending processor".to_string(),
-        factory: register_lending_contract,
-        args: Some(
-            serde_json::json!({"contract_address": "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"}),
-        ),
-    };
-    let worker = Worker::new(
-        vec![processor_config],
-        database_url,
-        Network::Testnet,
-        None,
-        Some(SyncOptions {
-            start_ts: Some(1716560632750),
-            step: Some(1800000 * 10),
-            back_step: None,
-            sync_duration: None,
-        }),
-        Some(FetchStrategy::Parallel { num_workers: 10 }),
-    )
-    .await?;
-
-    let _ = worker.run().await;
     Ok(())
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = bento_core::schema::loan_actions)]
+#[diesel(table_name = bento_types::schema::loan_actions)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanActionModel {
     loan_subcontract_id: String,
@@ -90,7 +69,7 @@ pub struct LoanActionModel {
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = bento_core::schema::loan_details)]
+#[diesel(table_name = bento_types::schema::loan_details)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanDetailModel {
     loan_subcontract_id: String,
@@ -109,7 +88,12 @@ pub struct LendingContractProcessor {
 }
 
 impl LendingContractProcessor {
-    pub fn new(connection_pool: Arc<DbPool>, contract_address: String) -> Self {
+    pub fn new(connection_pool: Arc<DbPool>, args: serde_json::Value) -> Self {
+        let contract_address = args
+            .get("contract_address")
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| panic!("Missing contract address argument"))
+            .to_string();
         Self { connection_pool, contract_address }
     }
 }
@@ -149,6 +133,14 @@ impl ProcessorTrait for LendingContractProcessor {
 
     fn connection_pool(&self) -> &Arc<DbPool> {
         &self.connection_pool
+    }
+
+    fn get_processor(
+        &self,
+        pool: Arc<DbPool>,
+        args: Option<serde_json::Value>,
+    ) -> Box<dyn ProcessorTrait> {
+        Box::new(LendingContractProcessor::new(pool, args.unwrap_or_default()))
     }
 
     async fn process_blocks(
@@ -213,7 +205,7 @@ pub async fn insert_loan_actions_to_db(
     actions: Vec<LoanActionModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(bento_core::schema::loan_actions::table)
+    insert_into(bento_types::schema::loan_actions::table)
         .values(&actions)
         .execute(&mut conn)
         .await?;
@@ -226,7 +218,7 @@ pub async fn insert_loan_details_to_db(
     details: Vec<LoanDetailModel>,
 ) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(bento_core::schema::loan_details::table)
+    insert_into(bento_types::schema::loan_details::table)
         .values(&details)
         .execute(&mut conn)
         .await?;

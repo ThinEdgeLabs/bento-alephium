@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use diesel::prelude::*;
 use serde::Serialize;
 
-use crate::types::{BlockHash, DEFAULT_GROUP_NUM};
+use crate::{BlockHash, DEFAULT_GROUP_NUM};
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset, Identifiable)]
 #[diesel(table_name = crate::schema::blocks)]

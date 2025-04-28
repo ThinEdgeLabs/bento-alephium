@@ -3,11 +3,11 @@ use std::{sync::Arc, time::Instant};
 use anyhow::Result;
 use futures::{stream::FuturesOrdered, StreamExt};
 
-use crate::{
-    client::Client,
-    traits::BlockProvider,
-    types::{BlockAndEvents, BlockBatch, BlockRange, MAX_TIMESTAMP_RANGE},
-};
+use crate::client::Client;
+
+use bento_trait::stage::BlockProvider;
+
+use bento_types::{BlockAndEvents, BlockBatch, BlockRange, MAX_TIMESTAMP_RANGE};
 
 pub async fn fetch_parallel(
     client: Arc<Client>,

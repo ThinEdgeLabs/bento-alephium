@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::db::DbPool;
+use crate::DbPool;
 
 use crate::schema::processor_status;
 use anyhow::Result;

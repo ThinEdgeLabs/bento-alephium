@@ -1,5 +1,6 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use bento_types::repository::{get_tx_by_hash, get_txs, get_txs_by_block};
 
 use crate::api::error::AppError;
 use crate::api::handler::dto::{
@@ -7,7 +8,6 @@ use crate::api::handler::dto::{
 };
 use crate::api::AppState;
 use crate::api::Pagination;
-use crate::repository::{get_tx_by_hash, get_txs, get_txs_by_block};
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 

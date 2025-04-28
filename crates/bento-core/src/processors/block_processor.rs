@@ -3,15 +3,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use bento_trait::processor::ProcessorTrait;
+use bento_types::{
+    convert_bwe_to_block_models, processors::ProcessorOutput, BlockAndEvents, BlockModel,
+};
 use diesel::insert_into;
 use diesel_async::RunQueryDsl;
 
-use crate::models::convert_bwe_to_block_models;
-use crate::{
-    config::ProcessorConfig, db::DbPool, models::block::BlockModel, types::BlockAndEvents,
-};
-
-use super::{ProcessorOutput, ProcessorTrait};
+use crate::{config::ProcessorConfig, db::DbPool};
 
 pub struct BlockProcessor {
     connection_pool: Arc<DbPool>,
@@ -44,6 +43,14 @@ impl ProcessorTrait for BlockProcessor {
         &self.connection_pool
     }
 
+    fn get_processor(
+        &self,
+        pool: Arc<DbPool>,
+        _args: Option<serde_json::Value>,
+    ) -> Box<dyn ProcessorTrait> {
+        Box::new(BlockProcessor::new(pool))
+    }
+
     async fn process_blocks(
         &self,
         _from: i64,
@@ -58,6 +65,9 @@ impl ProcessorTrait for BlockProcessor {
 /// Insert blocks into the database.
 pub async fn insert_to_db(db: Arc<DbPool>, blocks: Vec<BlockModel>) -> Result<()> {
     let mut conn = db.get().await?;
-    insert_into(crate::schema::blocks::table).values(&blocks).execute(&mut conn).await?;
+    insert_into(bento_types::schema::blocks::dsl::blocks)
+        .values(&blocks)
+        .execute(&mut conn)
+        .await?;
     Ok(())
 }

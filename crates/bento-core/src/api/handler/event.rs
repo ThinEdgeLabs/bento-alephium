@@ -1,13 +1,13 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use bento_types::repository::{get_events, get_events_by_contract, get_events_by_tx};
+use bento_types::EventModel;
 
 use crate::api::error::AppError;
 use crate::api::handler::dto::event::EventByContractQuery;
 use crate::api::handler::dto::EventsQuery;
 use crate::api::AppState;
 use crate::api::Pagination;
-use crate::models::event::EventModel;
-use crate::repository::{get_events, get_events_by_contract, get_events_by_tx};
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 

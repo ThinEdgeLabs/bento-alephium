@@ -1,5 +1,5 @@
 use crate::models::BlockModel;
-use crate::{schema::transactions, types::BlockHash};
+use crate::{schema::transactions, BlockHash};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 #[derive(

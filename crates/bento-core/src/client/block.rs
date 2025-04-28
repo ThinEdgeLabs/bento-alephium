@@ -1,13 +1,11 @@
 use std::time::Duration;
 
-use crate::{
-    traits::BlockProvider,
-    types::{
-        BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
-        BlocksPerTimestampRange,
-    },
-};
 use backoff::{backoff::Backoff, ExponentialBackoff as BackoffExp};
+use bento_trait::stage::BlockProvider;
+use bento_types::{
+    BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
+    BlocksPerTimestampRange,
+};
 
 use anyhow::Result;
 use async_trait::async_trait;

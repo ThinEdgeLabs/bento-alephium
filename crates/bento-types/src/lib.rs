@@ -1,4 +1,23 @@
+pub mod errors;
+pub mod models;
+pub mod processors;
+pub mod repository;
+pub mod schema;
+pub mod utils;
+use std::fmt::Debug;
+
+pub use models::*;
+// Database pool type aliases
+pub type DbPool = Pool<AsyncPgConnection>;
+
+// Database pool connection type aliases
+pub type DbPoolConnection<'a> = PooledConnection<'a, AsyncPgConnection>;
+
 use crate::processors::ProcessorOutput;
+use diesel_async::{
+    pooled_connection::bb8::{Pool, PooledConnection},
+    AsyncPgConnection,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 pub const DEFAULT_GROUP_NUM: i64 = 4;
@@ -7,6 +26,12 @@ pub const REORG_TIMEOUT: i64 = 210 * 16 * 1000; // 210 blocks * 16 seconds
 pub type Event = ContractEventByBlockHash;
 pub type BlockHash = String;
 pub type GroupIndex = i64;
+
+/// Trait for custom processor outputs
+pub trait CustomProcessorOutput: Send + Sync + Debug + 'static {
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn clone_box(&self) -> Box<dyn CustomProcessorOutput>;
+}
 
 /// Represents the header of a block in a blockchain.
 /// Contains information such as the hash, timestamp, chain range, and block height.

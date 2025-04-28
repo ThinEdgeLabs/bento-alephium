@@ -1,6 +1,7 @@
-use crate::{traits::TransactionProvider, types::Transaction};
 use anyhow::Result;
 use async_trait::async_trait;
+use bento_trait::stage::TransactionProvider;
+use bento_types::Transaction;
 use url::Url;
 
 use super::Client;

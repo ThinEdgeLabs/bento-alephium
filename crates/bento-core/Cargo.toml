@@ -3,11 +3,13 @@ description = "Bento Core"
 name = "bento-core"
 version = "0.1.0"
 
-authors = {workspace = true}
-edition = {workspace = true}
-license = {workspace = true}
+authors = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
+bento-trait = { path = "../../crates/bento-trait" }
+bento-types = { path = "../../crates/bento-types" }
 actix-web.workspace = true
 allocative.workspace = true
 allocative_derive.workspace = true

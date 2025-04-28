@@ -3,12 +3,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use bento_trait::processor::ProcessorTrait;
+use bento_types::{convert_bwe_to_event_models, processors::ProcessorOutput, BlockAndEvents};
 
-use crate::{
-    config::ProcessorConfig, db::DbPool, models::convert_bwe_to_event_models, types::BlockAndEvents,
-};
-
-use super::{ProcessorOutput, ProcessorTrait};
+use crate::{config::ProcessorConfig, db::DbPool};
 
 pub struct EventProcessor {
     connection_pool: Arc<DbPool>,
@@ -39,6 +37,14 @@ impl ProcessorTrait for EventProcessor {
 
     fn connection_pool(&self) -> &Arc<DbPool> {
         &self.connection_pool
+    }
+
+    fn get_processor(
+        &self,
+        pool: Arc<DbPool>,
+        _args: Option<serde_json::Value>,
+    ) -> Box<dyn ProcessorTrait> {
+        Box::new(EventProcessor::new(pool))
     }
 
     async fn process_blocks(

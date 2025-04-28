@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use diesel::{insert_into, query_dsl::methods::FilterDsl, SelectableHelper};
 
-use crate::types::Order;
-use crate::{db::DbPool, models::block::BlockModel};
+use crate::Order;
+use crate::{models::block::BlockModel, DbPool};
 use anyhow::Result;
 use diesel::ExpressionMethods;
 

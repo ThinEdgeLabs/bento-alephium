@@ -1,10 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = [
-  "crates/*",
-  "examples/*",
-]
+members = ["crates/*", "examples/*"]
 
 [workspace.package]
 authors = ["Your Name <your.email@example.com>"]
@@ -13,8 +10,10 @@ license = "MIT OR Apache-2.0"
 version = "0.1.0"
 
 [workspace.dependencies]
-bento-cli = {path = "crates/bento-cli"}
-bento-core = {path = "crates/bento-core"}
+bento-cli = { path = "crates/bento-cli" }
+bento-core = { path = "crates/bento-core" }
+bento-trait = { path = "crates/bento-trait" }
+bento-types = { path = "crates/bento-types" }
 
 actix-web = "4.0.0"
 allocative = "0.3.4"
@@ -24,33 +23,46 @@ async-trait = "0.1.85"
 axum = "0.8.1"
 backoff = "0.4.0"
 base64 = "0.22.1"
-bigdecimal = {version = "0.4.1", features = ["serde"]}
-chrono = {version = "0.4.31", features = ["serde"]}
-clap = {version = "4.5.32", features = ["derive"]}
-diesel = {version = "2.2.6", features = ["chrono", "postgres_backend", "numeric", "serde_json"]}
-diesel-async = {version = "0.5.2", features = ["async-connection-wrapper", "postgres", "bb8", "tokio"]}
+bigdecimal = { version = "0.4.1", features = ["serde"] }
+chrono = { version = "0.4.31", features = ["serde"] }
+clap = { version = "4.5.32", features = ["derive"] }
+diesel = { version = "2.2.6", features = [
+  "chrono",
+  "postgres_backend",
+  "numeric",
+  "serde_json",
+] }
+diesel-async = { version = "0.5.2", features = [
+  "async-connection-wrapper",
+  "postgres",
+  "bb8",
+  "tokio",
+] }
 diesel-enum = "0.2.1"
 diesel_async_migrations = "0.15.0"
-diesel_migrations = {version = "2.1.0", features = ["postgres"]}
+diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 dotenv = "0.15"
 dotenvy = "0.15"
 env_logger = "0.11.6"
 futures = "0.3.31"
-futures-util = {version = "0.3.31", default-features = false, features = ["sink", "std"]}
+futures-util = { version = "0.3.31", default-features = false, features = [
+  "sink",
+  "std",
+] }
 log = "0.4.25"
 native-tls = "=0.2.12"
 postgres-native-tls = "=0.5.0"
 rand = "0.9.0"
 regex = "1.11.1"
-reqwest = {version = "0.12.12", features = ["json"]}
+reqwest = { version = "0.12.12", features = ["json"] }
 reqwest-middleware = "0.4.1"
 reqwest-retry = "0.7.0"
 rstest = "0.24.0"
-serde = {version = "1.0.217", features = ["derive"]}
-serde_json = {version = "1.0.137", features = ["raw_value"]}
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = { version = "1.0.137", features = ["raw_value"] }
 tempfile = "3.16.0"
 thiserror = "2.0.11"
-tokio = {version = "1.43.0", features = ["full"]}
+tokio = { version = "1.43.0", features = ["full"] }
 tokio-postgres = "=0.7.12"
 tokio-tungstenite = "0.26.1"
 toml = "0.8.20"
@@ -59,5 +71,5 @@ tracing-subscriber = "0.3.19"
 url = "2.5.4"
 utoipa = "5.3.1"
 utoipa-axum = "0.2.0"
-utoipa-swagger-ui = {version = "9.0.0", features = ["axum"]}
-uuid = {version = "1.15.1", features = ["v4"]}
+utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
+uuid = { version = "1.15.1", features = ["v4"] }

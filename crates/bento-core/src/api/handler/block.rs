@@ -1,11 +1,13 @@
 use axum::extract::{Query, State};
 use axum::Json;
+use bento_types::repository::{
+    get_block_by_hash, get_block_by_height, get_block_transactions, get_blocks,
+};
 
 use crate::api::error::AppError;
 use crate::api::handler::dto::{BlockByHeightQuery, TransactionDto};
 use crate::api::handler::dto::{BlockDto, BlocksQuery};
-use crate::repository::{get_block_by_hash, get_block_by_height, get_block_transactions};
-use crate::{api::AppState, repository::get_blocks};
+use crate::api::AppState;
 use axum::response::IntoResponse;
 use utoipa_axum::{router::OpenApiRouter, routes};
 

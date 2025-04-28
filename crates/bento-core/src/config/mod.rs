@@ -1,14 +1,12 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use bento_trait::processor::{new_processor, DynProcessor, ProcessorTrait};
 
-use crate::{
-    db::{new_db_pool, DbPool},
-    processors::DynProcessor,
-};
+use crate::db::{new_db_pool, DbPool};
 
 // Function type for processor factories
-pub type ProcessorFactory = fn(Arc<DbPool>, Option<serde_json::Value>) -> DynProcessor;
+pub type ProcessorFactory = fn(Arc<DbPool>, Option<serde_json::Value>) -> Box<dyn ProcessorTrait>;
 
 /// Extensible processor configuration with support for custom processors
 #[derive(Debug, Clone)]
@@ -48,15 +46,15 @@ impl ProcessorConfig {
     /// Build a processor from this config
     pub fn build_processor(&self, db_pool: Arc<DbPool>) -> DynProcessor {
         match self {
-            ProcessorConfig::BlockProcessor => crate::processors::new_processor(
-                crate::processors::block_processor::BlockProcessor::new(db_pool),
-            ),
-            ProcessorConfig::EventProcessor => crate::processors::new_processor(
-                crate::processors::event_processor::EventProcessor::new(db_pool),
-            ),
-            ProcessorConfig::TxProcessor => crate::processors::new_processor(
-                crate::processors::tx_processor::TxProcessor::new(db_pool),
-            ),
+            ProcessorConfig::BlockProcessor => {
+                new_processor(crate::processors::block_processor::BlockProcessor::new(db_pool))
+            }
+            ProcessorConfig::EventProcessor => {
+                new_processor(crate::processors::event_processor::EventProcessor::new(db_pool))
+            }
+            ProcessorConfig::TxProcessor => {
+                new_processor(crate::processors::tx_processor::TxProcessor::new(db_pool))
+            }
             ProcessorConfig::Custom { factory, args, .. } => factory(db_pool, args.clone()),
         }
     }
