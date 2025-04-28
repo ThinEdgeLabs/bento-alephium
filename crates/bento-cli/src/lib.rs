@@ -5,10 +5,9 @@ use anyhow::{Context, Result};
 use bento_core::{
     client::Network,
     config::ProcessorConfig,
-    workers::worker_v2::{SyncOptions, Worker},
+    workers::worker_v2::Worker,
     ProcessorFactory,
 };
-use std::sync::Arc;
 use std::{fs, path::Path};
 
 pub fn config_from_args(args: &CliArgs) -> Result<Config> {

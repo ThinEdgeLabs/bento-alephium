@@ -23,15 +23,9 @@ use diesel_async::RunQueryDsl;
 use diesel_enum::DbEnum;
 use serde::Serialize;
 
-use std::vec;
 
 use bento_cli::*;
 
-use bento_core::{
-    client::Network,
-    config::ProcessorConfig,
-    workers::worker_v2::{SyncOptions, Worker},
-};
 
 fn processor_factory() -> ProcessorFactory {
     |db_pool, args: Option<serde_json::Value>| {
