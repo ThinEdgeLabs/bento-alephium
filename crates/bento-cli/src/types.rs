@@ -43,7 +43,6 @@ pub struct WorkerConfig {
     pub start: u64,
     pub step: u64,
     pub sync_duration: u64,
-    pub strategy_name: String,
     pub workers: Option<u32>,
     pub chunk_size: Option<u32>,
 }
@@ -55,7 +54,6 @@ pub struct ServerConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BackfillConfig {
-    pub enabled: bool,
     pub start: u64,
     pub end: u64,
 }

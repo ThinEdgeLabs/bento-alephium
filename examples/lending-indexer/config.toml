@@ -1,0 +1,22 @@
+[worker]
+database_url = "postgresql://user:password@localhost:5432/mydatabase"
+rpc_url = "https://node.testnet.alephium.org"
+start = 1716560632750
+step = 1000
+sync_duration = 1000
+
+[worker.strategy]
+name = "parallel"
+workers = 10
+
+[server]
+port = "8080"
+
+[backfill]
+name = "backfill-1"
+start = 1716560632750
+end = 1716560632750
+
+[processors.lending]
+name = "Lending Processor"
+contract_address = "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"
