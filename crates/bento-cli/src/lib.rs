@@ -1,5 +1,6 @@
 use crate::types::*;
 pub mod types;
+use clap::Parser;
 
 use anyhow::{Context, Result};
 use bento_core::{
@@ -103,6 +104,19 @@ pub async fn run_backfill(args: CliArgs, factory: ProcessorFactory) -> Result<()
 
     Ok(())
 }
+
+pub async fn run_command(factory: ProcessorFactory) -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Run(run) => match run.mode {
+            RunMode::Server(args) => run_server(args).await?,
+            RunMode::Worker(args) => run_worker(args, factory).await?,
+            RunMode::Backfill(args) => run_backfill(args, factory).await?,
+        },
+    }
+    Ok(())
+}
+
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
     let content = fs::read_to_string(path).context("Failed to read config file")?;
     let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
