@@ -1,0 +1,12 @@
+[package]
+name = "event-indexer"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+bento-core = {path = "../../crates/bento-core"}
+dotenvy.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true

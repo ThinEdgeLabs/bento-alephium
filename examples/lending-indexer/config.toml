@@ -1,0 +1,22 @@
+[worker]
+database_url = "postgresql://postgres:123456789@localhost:5432/bento_alephium"
+rpc_url = "https://node.testnet.alephium.org"
+start = 1716560632750
+step = 18000000
+sync_duration = 1000
+
+[worker.strategy]
+name = "parallel"
+workers = 10
+
+[server]
+port = "8080"
+
+[backfill]
+name = "backfill-1"
+start = 1716560632750
+end = 1716560632750
+
+[processors.lending]
+name = "lending"
+contract_address = "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"

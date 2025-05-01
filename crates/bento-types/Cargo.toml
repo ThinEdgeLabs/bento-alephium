@@ -1,0 +1,27 @@
+[package]
+name = "bento-types"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+diesel-async.workspace = true
+postgres-native-tls.workspace = true
+serde.workspace = true
+utoipa.workspace = true
+diesel.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+axum.workspace = true
+thiserror.workspace = true
+diesel_migrations.workspace = true
+futures-util.workspace = true
+url.workspace = true
+tokio-postgres.workspace = true
+native-tls.workspace = true
