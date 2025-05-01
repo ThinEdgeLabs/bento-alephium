@@ -12,13 +12,6 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
     /// Access to the connection pool
     fn connection_pool(&self) -> &Arc<DbPool>;
 
-    ///  helper for constructing the processor object
-    fn get_processor(
-        &self,
-        pool: Arc<DbPool>,
-        args: Option<serde_json::Value>,
-    ) -> Box<dyn ProcessorTrait>;
-
     /// Process a batch of blocks and produce output
     async fn process_blocks(
         &self,

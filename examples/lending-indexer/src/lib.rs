@@ -100,19 +100,11 @@ impl CustomProcessorOutput for LendingContractOutput {
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
     fn name(&self) -> &'static str {
-        "lending_processor"
+        "lending"
     }
 
     fn connection_pool(&self) -> &Arc<DbPool> {
         &self.connection_pool
-    }
-
-    fn get_processor(
-        &self,
-        pool: Arc<DbPool>,
-        args: Option<serde_json::Value>,
-    ) -> Box<dyn ProcessorTrait> {
-        Box::new(LendingContractProcessor::new(pool, args.unwrap_or_default()))
     }
 
     async fn process_blocks(

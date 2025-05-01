@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use clap::{Args, Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +40,7 @@ pub struct BackfillStatusArgs {
 
     /// The processor name to check the backfill status for
     /// This is a required argument
-    #[arg(short, long)]
+    #[arg(short, long = "processor")]
     pub processor_name: String,
 }
 
@@ -80,13 +82,15 @@ pub struct BackfillConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessorsConfig {
-    pub lending: Option<LendingConfig>,
+    #[serde(flatten)]
+    pub processors: HashMap<String, ProcessorTypeConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct LendingConfig {
+pub struct ProcessorTypeConfig {
     pub name: String,
-    pub contract_address: String,
+    #[serde(flatten)]
+    pub config: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Args)]

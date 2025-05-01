@@ -6,7 +6,10 @@ use async_trait::async_trait;
 use bento_trait::processor::ProcessorTrait;
 use bento_types::{convert_bwe_to_tx_models, processors::ProcessorOutput, BlockAndEvents};
 
-use crate::{config::ProcessorConfig, db::DbPool};
+use crate::{config::ProcessorConfig, db::DbPool, ProcessorFactory};
+pub fn processor_factory() -> ProcessorFactory {
+    |db_pool, _args: Option<serde_json::Value>| Box::new(TxProcessor::new(db_pool))
+}
 
 pub struct TxProcessor {
     connection_pool: Arc<DbPool>,
@@ -37,14 +40,6 @@ impl ProcessorTrait for TxProcessor {
 
     fn connection_pool(&self) -> &Arc<DbPool> {
         &self.connection_pool
-    }
-
-    fn get_processor(
-        &self,
-        pool: Arc<DbPool>,
-        _args: Option<serde_json::Value>,
-    ) -> Box<dyn ProcessorTrait> {
-        Box::new(TxProcessor::new(pool))
     }
 
     async fn process_blocks(

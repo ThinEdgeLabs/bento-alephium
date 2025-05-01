@@ -10,7 +10,11 @@ use bento_types::{
 use diesel::insert_into;
 use diesel_async::RunQueryDsl;
 
-use crate::{config::ProcessorConfig, db::DbPool};
+use crate::{config::ProcessorConfig, db::DbPool, ProcessorFactory};
+
+pub fn processor_factory() -> ProcessorFactory {
+    |db_pool, _args: Option<serde_json::Value>| Box::new(BlockProcessor::new(db_pool))
+}
 
 pub struct BlockProcessor {
     connection_pool: Arc<DbPool>,
@@ -41,14 +45,6 @@ impl ProcessorTrait for BlockProcessor {
 
     fn connection_pool(&self) -> &Arc<DbPool> {
         &self.connection_pool
-    }
-
-    fn get_processor(
-        &self,
-        pool: Arc<DbPool>,
-        _args: Option<serde_json::Value>,
-    ) -> Box<dyn ProcessorTrait> {
-        Box::new(BlockProcessor::new(pool))
     }
 
     async fn process_blocks(

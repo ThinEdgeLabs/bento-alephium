@@ -1,7 +1,8 @@
-use lending_example::processor_factory;
-
+use std::collections::HashMap;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    bento_cli::run_command(processor_factory()).await?;
+    let mut processor_factories = HashMap::new();
+    processor_factories.insert("lending".to_string(), lending_example::processor_factory());
+    bento_cli::run_command(processor_factories, true).await?;
     Ok(())
 }

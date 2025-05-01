@@ -226,8 +226,7 @@ impl Worker {
                 let mut current_ts =
                     sync_opts_clone.start_ts.unwrap_or(0).max(last_ts.try_into().unwrap());
                 let step = sync_opts_clone.step.unwrap_or(1000);
-                let sync_duration =
-                    Duration::from_secs(sync_opts_clone.sync_duration.unwrap_or(1) as u64);
+                let sync_duration = Duration::from_secs(sync_opts_clone.sync_duration.unwrap_or(1));
 
                 loop {
                     let to_ts = current_ts + step;

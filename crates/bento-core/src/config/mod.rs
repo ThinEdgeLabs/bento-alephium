@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
 use bento_trait::processor::{new_processor, DynProcessor, ProcessorTrait};
 
-use crate::db::{new_db_pool, DbPool};
+use crate::db::DbPool;
 
 // Function type for processor factories
 pub type ProcessorFactory = fn(Arc<DbPool>, Option<serde_json::Value>) -> Box<dyn ProcessorTrait>;
@@ -27,9 +26,9 @@ pub enum ProcessorConfig {
 impl ProcessorConfig {
     pub fn name(&self) -> &str {
         match self {
-            ProcessorConfig::BlockProcessor => "block_processor",
-            ProcessorConfig::EventProcessor => "event_processor",
-            ProcessorConfig::TxProcessor => "tx_processor",
+            ProcessorConfig::BlockProcessor => "block",
+            ProcessorConfig::EventProcessor => "event",
+            ProcessorConfig::TxProcessor => "tx",
             ProcessorConfig::Custom { name, .. } => name,
         }
     }

@@ -16,7 +16,17 @@ pub async fn get_last_timestamp(db_pool: &Arc<DbPool>, processor_name: &str) -> 
         .first::<i64>(&mut conn)
         .await
         .optional()?;
-    Ok(ts.unwrap_or(0))
+
+    match ts {
+        Some(ts) => {
+            tracing::info!(processor = processor_name, last_timestamp = ts, "Found last timestamp");
+            Ok(ts)
+        }
+        None => {
+            tracing::info!(processor = processor_name, "No last timestamp found");
+            Err(anyhow::anyhow!("No last timestamp found for processor: {}", processor_name))
+        }
+    }
 }
 
 pub async fn update_last_timestamp(
