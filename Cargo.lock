@@ -562,6 +562,9 @@ dependencies = [
  "futures-util",
  "native-tls",
  "postgres-native-tls",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -1096,6 +1099,7 @@ name = "event-indexer"
 version = "0.1.0"
 dependencies = [
  "bento-core",
+ "bento-types",
  "dotenvy",
  "tokio",
  "tracing-subscriber",

@@ -42,6 +42,11 @@ pub struct BackfillStatusArgs {
     /// This is a required argument
     #[arg(short, long = "processor")]
     pub processor_name: String,
+
+    /// The network to check the backfill status for
+    /// This is a required argument
+    #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"])]
+    pub network: String,
 }
 
 impl From<BackfillStatusArgs> for CliArgs {
@@ -61,7 +66,8 @@ pub struct Config {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WorkerConfig {
     pub database_url: String,
-    pub rpc_url: String,
+    pub rpc_url: Option<String>,
+    pub network: String,
     pub start: u64,
     pub step: u64,
     pub sync_duration: u64,

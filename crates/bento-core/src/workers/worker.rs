@@ -1,16 +1,17 @@
 use crate::{
-    client::{Client, Network},
+    client::Client,
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
 };
 use bento_trait::{processor::DynProcessor, stage::StageHandler};
 use bento_types::{
+    network::Network,
     processors::ProcessorOutput,
     repository::{
         insert_blocks_to_db, insert_events_to_db, insert_txs_to_db,
         processor_status::{get_last_timestamp, update_last_timestamp},
     },
-    BlockBatch, BlockRange, FetchStrategy, StageMessage,
+    BlockRange, FetchStrategy, StageMessage,
 };
 
 use anyhow::Result;
@@ -136,7 +137,12 @@ impl Worker {
 
                 let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
 
-                let last_ts = get_last_timestamp(&pool_clone, processor_name).await?;
+                let last_ts = get_last_timestamp(
+                    &pool_clone,
+                    processor_name,
+                    client_clone.clone().network.clone().into(),
+                )
+                .await?;
                 let mut current_ts =
                     sync_opts_clone.start_ts.unwrap_or(0).max(last_ts.try_into().unwrap());
                 let step = sync_opts_clone.step.unwrap_or(1000);
@@ -165,6 +171,7 @@ impl Worker {
                         update_last_timestamp(
                             &pool_clone,
                             processor_name,
+                            (client_clone.network.clone()).into(),
                             to_ts.try_into().unwrap(),
                         )
                         .await?;

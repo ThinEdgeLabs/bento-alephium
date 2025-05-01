@@ -25,3 +25,6 @@ futures-util.workspace = true
 url.workspace = true
 tokio-postgres.workspace = true
 native-tls.workspace = true
+reqwest.workspace = true
+reqwest-middleware.workspace = true
+reqwest-retry.workspace = true
