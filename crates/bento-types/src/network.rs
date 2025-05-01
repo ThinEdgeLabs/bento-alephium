@@ -108,3 +108,220 @@ impl From<String> for NetworkType {
         }
     }
 }
+
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+    use std::env;
+
+    fn cleanup_env_vars() {
+        env::remove_var("DEV_NODE_URL");
+        env::remove_var("TESTNET_NODE_URL");
+        env::remove_var("MAINNET_NODE_URL");
+        env::remove_var("ENVIRONMENT");
+    }
+
+    #[test]
+    fn test_base_url_with_env_vars() {
+        cleanup_env_vars();
+
+        // Set environment variables
+        env::set_var("DEV_NODE_URL", "http://custom-dev.example.com");
+        env::set_var("TESTNET_NODE_URL", "http://custom-testnet.example.com");
+        env::set_var("MAINNET_NODE_URL", "http://custom-mainnet.example.com");
+
+        // Test that URLs come from environment variables when set
+        assert_eq!(Network::Devnet.base_url(), "http://custom-dev.example.com");
+        assert_eq!(Network::Testnet.base_url(), "http://custom-testnet.example.com");
+        assert_eq!(Network::Mainnet.base_url(), "http://custom-mainnet.example.com");
+
+        cleanup_env_vars();
+    }
+
+    #[test]
+    fn test_identifier() {
+        assert_eq!(Network::Devnet.identifier(), "devnet");
+        assert_eq!(Network::Testnet.identifier(), "testnet");
+        assert_eq!(Network::Mainnet.identifier(), "mainnet");
+
+        let custom_network = Network::Custom("http://example.com".to_string(), NetworkType::Devnet);
+        assert_eq!(custom_network.identifier(), "devnet");
+    }
+
+    #[test]
+    fn test_custom_network_creation() {
+        let url = "http://custom.example.com";
+        let network_type = NetworkType::Testnet;
+
+        let custom_network = Network::custom(url, network_type);
+
+        // Verify it's created correctly
+        match custom_network {
+            Network::Custom(stored_url, stored_type) => {
+                assert_eq!(stored_url, url);
+                match stored_type {
+                    NetworkType::Testnet => (),
+                    _ => panic!("Wrong network type stored"),
+                }
+            }
+            _ => panic!("Should have created a Custom network variant"),
+        }
+    }
+
+    #[test]
+    fn test_network_type_to_string() {
+        assert_eq!(NetworkType::Devnet.to_string(), "devnet");
+        assert_eq!(NetworkType::Testnet.to_string(), "testnet");
+        assert_eq!(NetworkType::Mainnet.to_string(), "mainnet");
+    }
+
+    #[test]
+    fn test_network_default() {
+        cleanup_env_vars();
+
+        // Test default when ENVIRONMENT is not set
+        let default_network = Network::default();
+        match default_network {
+            Network::Mainnet => (),
+            _ => panic!("Default should be Mainnet when ENVIRONMENT is not set"),
+        }
+
+        // Test with ENVIRONMENT set to development
+        env::set_var("ENVIRONMENT", "development");
+        let dev_network = Network::default();
+        match dev_network {
+            Network::Devnet => (),
+            _ => panic!("Should be Devnet when ENVIRONMENT is set to development"),
+        }
+
+        // Test with ENVIRONMENT set to testnet
+        env::set_var("ENVIRONMENT", "testnet");
+        let test_network = Network::default();
+        match test_network {
+            Network::Testnet => (),
+            _ => panic!("Should be Testnet when ENVIRONMENT is set to testnet"),
+        }
+
+        // Test with ENVIRONMENT set to mainnet
+        env::set_var("ENVIRONMENT", "mainnet");
+        let main_network = Network::default();
+        match main_network {
+            Network::Mainnet => (),
+            _ => panic!("Should be Mainnet when ENVIRONMENT is set to mainnet"),
+        }
+
+        // Test with ENVIRONMENT set to something else
+        env::set_var("ENVIRONMENT", "unknown");
+        let unknown_network = Network::default();
+        match unknown_network {
+            Network::Mainnet => (),
+            _ => panic!("Should default to Mainnet for unknown environment"),
+        }
+
+        cleanup_env_vars();
+    }
+
+    #[test]
+    fn test_network_to_string_conversion() {
+        let devnet_string: String = Network::Devnet.into();
+        assert_eq!(devnet_string, "devnet");
+
+        let testnet_string: String = Network::Testnet.into();
+        assert_eq!(testnet_string, "testnet");
+
+        let mainnet_string: String = Network::Mainnet.into();
+        assert_eq!(mainnet_string, "mainnet");
+
+        let custom_network =
+            Network::Custom("http://example.com".to_string(), NetworkType::Testnet);
+        let custom_string: String = custom_network.into();
+        assert_eq!(custom_string, "testnet");
+    }
+
+    #[test]
+    fn test_string_to_network_conversion() {
+        let devnet: Network = "devnet".to_string().into();
+        match devnet {
+            Network::Devnet => (),
+            _ => panic!("Should convert 'devnet' string to Network::Devnet"),
+        }
+
+        let testnet: Network = "testnet".to_string().into();
+        match testnet {
+            Network::Testnet => (),
+            _ => panic!("Should convert 'testnet' string to Network::Testnet"),
+        }
+
+        let mainnet: Network = "mainnet".to_string().into();
+        match mainnet {
+            Network::Mainnet => (),
+            _ => panic!("Should convert 'mainnet' string to Network::Mainnet"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid network type")]
+    fn test_invalid_string_to_network_conversion() {
+        let _invalid: Network = "invalid".to_string().into();
+        // This should panic
+    }
+
+    #[test]
+    fn test_string_to_network_type_conversion() {
+        let devnet: NetworkType = "devnet".to_string().into();
+        match devnet {
+            NetworkType::Devnet => (),
+            _ => panic!("Should convert 'devnet' string to NetworkType::Devnet"),
+        }
+
+        let testnet: NetworkType = "testnet".to_string().into();
+        match testnet {
+            NetworkType::Testnet => (),
+            _ => panic!("Should convert 'testnet' string to NetworkType::Testnet"),
+        }
+
+        let mainnet: NetworkType = "mainnet".to_string().into();
+        match mainnet {
+            NetworkType::Mainnet => (),
+            _ => panic!("Should convert 'mainnet' string to NetworkType::Mainnet"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid network type")]
+    fn test_invalid_string_to_network_type_conversion() {
+        let _invalid: NetworkType = "invalid".to_string().into();
+        // This should panic
+    }
+
+    #[test]
+    fn test_clone() {
+        let network = Network::Testnet;
+        let cloned_network = network.clone();
+
+        match cloned_network {
+            Network::Testnet => (),
+            _ => panic!("Cloned network should match original"),
+        }
+
+        let network_type = NetworkType::Devnet;
+        let cloned_type = network_type.clone();
+
+        match cloned_type {
+            NetworkType::Devnet => (),
+            _ => panic!("Cloned network type should match original"),
+        }
+    }
+
+    #[test]
+    fn test_debug() {
+        // This test simply ensures that Debug is implemented correctly
+        let network = Network::Mainnet;
+        let debug_output = format!("{:?}", network);
+        assert!(debug_output.contains("Mainnet"));
+
+        let network_type = NetworkType::Testnet;
+        let debug_output = format!("{:?}", network_type);
+        assert!(debug_output.contains("Testnet"));
+    }
+}
