@@ -35,14 +35,16 @@ async fn new_worker_from_config(
     let mut processors = Vec::new();
 
     // Add processors from config based on what's available in processor_factories
-    for (processor_type, processor_config) in config.processors.processors.iter() {
-        if let Some(factory) = processor_factories.get(processor_type) {
-            let processor_config = ProcessorConfig::Custom {
-                name: processor_config.name.clone(),
-                factory: *factory,
-                args: Some(serde_json::to_value(processor_config)?),
-            };
-            processors.push(processor_config);
+    if let Some(processors_config) = &config.processors {
+        for (processor_type, processor_config) in processors_config.processors.iter() {
+            if let Some(factory) = processor_factories.get(processor_type) {
+                let processor_config = ProcessorConfig::Custom {
+                    name: processor_config.name.clone(),
+                    factory: *factory,
+                    args: Some(serde_json::to_value(processor_config)?),
+                };
+                processors.push(processor_config);
+            }
         }
     }
 

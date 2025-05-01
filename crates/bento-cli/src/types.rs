@@ -60,7 +60,7 @@ pub struct Config {
     pub worker: WorkerConfig,
     pub server: ServerConfig,
     pub backfill: BackfillConfig,
-    pub processors: ProcessorsConfig,
+    pub processors: Option<ProcessorsConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
