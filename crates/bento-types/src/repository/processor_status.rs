@@ -7,11 +7,21 @@ use anyhow::Result;
 use diesel::{insert_into, ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::RunQueryDsl;
 
-pub async fn get_last_timestamp(db_pool: &Arc<DbPool>, processor_name: &str) -> Result<i64> {
+pub async fn get_last_timestamp(
+    db_pool: &Arc<DbPool>,
+    processor_name: &str,
+    network: String,
+) -> Result<i64> {
     tracing::info!(processor = processor_name, "Getting last timestamp");
+
+    // Construct the processor key
+    let mut procesor_key = String::from(processor_name);
+    procesor_key.push_str("_");
+    procesor_key.push_str(&network);
+
     let mut conn = db_pool.get().await?;
     let ts = processor_status::table
-        .filter(processor_status::processor.eq(processor_name))
+        .filter(processor_status::processor.eq(procesor_key))
         .select(processor_status::last_timestamp)
         .first::<i64>(&mut conn)
         .await
@@ -32,17 +42,25 @@ pub async fn get_last_timestamp(db_pool: &Arc<DbPool>, processor_name: &str) -> 
 pub async fn update_last_timestamp(
     _db_pool: &Arc<DbPool>,
     processor_name: &str,
+    network: String,
     last_timestamp: i64,
 ) -> Result<()> {
     tracing::info!(
         processor = processor_name,
+        network = network,
         last_timestamp = last_timestamp,
         "Updating last timestamp"
     );
+
+    // Construct the processor key
+    let mut processor_key = String::from(processor_name);
+    processor_key.push_str("_");
+    processor_key.push_str(&network);
+
     let mut conn = _db_pool.get().await?;
     insert_into(processor_status::table)
         .values((
-            processor_status::processor.eq(processor_name),
+            processor_status::processor.eq(processor_key),
             processor_status::last_timestamp.eq(last_timestamp),
         ))
         .on_conflict(processor_status::processor)

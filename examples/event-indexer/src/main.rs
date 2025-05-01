@@ -1,8 +1,8 @@
 use bento_core::{
-    client::Network,
     config::ProcessorConfig,
-    workers::worker_v2::{SyncOptions, Worker},
+    workers::worker::{SyncOptions, Worker},
 };
+use bento_types::network::Network;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let worker = Worker::new(
         vec![processor_config],
         database_url,
-        Network::Testnet,
+        Network::Mainnet,
         None,
         Some(SyncOptions {
             start_ts: Some(1716560632750),

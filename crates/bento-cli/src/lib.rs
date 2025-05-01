@@ -1,17 +1,20 @@
 pub mod constants;
 pub mod types;
 use crate::types::*;
-use bento_types::{repository::processor_status::get_last_timestamp, FetchStrategy};
+use bento_types::{
+    network::Network, repository::processor_status::get_last_timestamp, FetchStrategy,
+};
 use clap::Parser;
 
 use anyhow::{Context, Result};
 use bento_core::{
-    client::Network, config::ProcessorConfig, new_db_pool, worker::SyncOptions,
-    workers::worker::Worker, ProcessorFactory,
+    config::ProcessorConfig, new_db_pool, worker::SyncOptions, workers::worker::Worker,
+    ProcessorFactory,
 };
 use bento_server::{start, Config as ServerConfig};
 use constants::{DEFAULT_BLOCK_PROCESSOR, DEFAULT_EVENT_PROCESSOR, DEFAULT_TX_PROCESSOR};
 use std::{collections::HashMap, fs, path::Path};
+
 pub fn config_from_args(args: &CliArgs) -> Result<Config> {
     let config_path = args.config_path.clone();
     let config_str = std::fs::read_to_string(config_path)?;
@@ -19,7 +22,7 @@ pub fn config_from_args(args: &CliArgs) -> Result<Config> {
     Ok(config)
 }
 
-async fn new_job_from_config(
+async fn new_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
     fetch_strategy: Option<FetchStrategy>,
@@ -54,12 +57,14 @@ async fn new_job_from_config(
         processors.push(ProcessorConfig::TxProcessor);
     }
 
-    let network = match worker_config.rpc_url.as_str() {
-        "mainnet" => Network::Mainnet,
-        "testnet" => Network::Testnet,
-        "devnet" => Network::Devnet,
-        rpc_url => Network::Custom(rpc_url.to_string()),
-    };
+    let network: Network;
+    if let Some(rpc_url) = &worker_config.rpc_url {
+        // Add the RPC URL to the network configuration
+        network = Network::Custom(rpc_url.to_string(), worker_config.network.clone().into());
+    } else {
+        // Use the default network configuration
+        network = worker_config.network.clone().into();
+    }
 
     // Create and return the worker
     let worker = Worker::new(
@@ -80,7 +85,7 @@ pub async fn new_realtime_worker_from_config(
     processor_factories: &HashMap<String, ProcessorFactory>,
     fetch_strategy: Option<FetchStrategy>,
 ) -> Result<Worker> {
-    new_job_from_config(
+    new_worker_from_config(
         config,
         processor_factories,
         fetch_strategy,
@@ -98,7 +103,7 @@ pub async fn new_backfill_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
-    new_job_from_config(
+    new_worker_from_config(
         config,
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
@@ -112,30 +117,7 @@ pub async fn new_backfill_worker_from_config(
     .await
 }
 
-pub async fn run_worker(
-    args: CliArgs,
-    processor_factories: &HashMap<String, ProcessorFactory>,
-) -> Result<()> {
-    println!("⚙️  Running real-time indexer with config: {}", args.config_path);
-
-    // Load config from args
-    let config = config_from_args(&args)?;
-
-    // Get the current timestamp for real-time indexing start point
-    let current_time = chrono::Utc::now().timestamp() as u64;
-
-    let worker = new_realtime_worker_from_config(&config, processor_factories, None).await?;
-
-    // Run the worker
-    println!("🚀 Starting real-time indexer from current time: {}", current_time);
-    worker.run().await?;
-
-    Ok(())
-}
-
-pub async fn new_server_from_args(args: &CliArgs) -> Result<ServerConfig> {
-    // Load config from args
-    let config = config_from_args(args)?;
+pub async fn new_server_config_from_config(config: &Config) -> Result<ServerConfig> {
     let db_pool = new_db_pool(&config.worker.database_url, None).await?;
     let server_config = ServerConfig {
         db_client: db_pool,
@@ -145,13 +127,43 @@ pub async fn new_server_from_args(args: &CliArgs) -> Result<ServerConfig> {
     Ok(server_config)
 }
 
+pub async fn run_worker(
+    args: CliArgs,
+    processor_factories: &HashMap<String, ProcessorFactory>,
+) -> Result<()> {
+    println!("⚙️  Running real-time indexer with config: {}", args.config_path);
+
+    // First convert args to config
+    let config = config_from_args(&args)?;
+
+    // Get the current timestamp for real-time indexing start point
+    let current_time = chrono::Utc::now().timestamp() as u64;
+
+    // Then create worker from config
+    let worker = new_realtime_worker_from_config(&config, processor_factories, None).await?;
+
+    // Run the worker
+    println!("🚀 Starting real-time indexer from current time: {}", current_time);
+    worker.run().await?;
+
+    Ok(())
+}
+
 pub async fn run_server(args: CliArgs) -> Result<()> {
     dotenvy::dotenv().ok();
     println!("Starting server...");
-    let config = new_server_from_args(&args).await?;
-    println!("Server is ready and running on http://{}", config.api_endpoint());
-    println!("Swagger UI is available at http://{}/swagger-ui", config.api_endpoint());
-    start(config).await?;
+
+    // First convert args to config
+    let config = config_from_args(&args)?;
+
+    // Then create server config from config
+    let server_config = new_server_config_from_config(&config).await?;
+
+    println!("Server is ready and running on http://{}", server_config.api_endpoint());
+    println!("Swagger UI is available at http://{}/swagger-ui", server_config.api_endpoint());
+
+    // Start the server
+    start(server_config).await?;
     Ok(())
 }
 
@@ -162,10 +174,10 @@ pub async fn run_backfill(
     println!("⚙️  Running backfill worker with config: {}", args.config_path);
     tracing_subscriber::fmt::init();
 
-    // Load config from args
+    // First convert args to config
     let config = config_from_args(&args)?;
 
-    // Create worker from config
+    // Then create worker from config
     let worker = new_backfill_worker_from_config(&config, processor_factories).await?;
 
     // Run the worker
@@ -232,25 +244,74 @@ pub async fn run_command(
     let cli = Cli::parse();
     match cli.command {
         Commands::Run(run) => match run.mode {
-            RunMode::Server(args) => run_server(args).await?,
-            RunMode::Worker(args) => run_worker(args, &processor_factories).await?,
-            RunMode::Backfill(args) => run_backfill(args, &processor_factories).await?,
+            RunMode::Server(args) => {
+                // First convert args to config
+                let config = config_from_args(&args)?;
+
+                // Start the server using the config
+                dotenvy::dotenv().ok();
+                println!("Starting server...");
+
+                // Create server config from config
+                let server_config = new_server_config_from_config(&config).await?;
+
+                println!("Server is ready and running on http://{}", server_config.api_endpoint());
+                println!(
+                    "Swagger UI is available at http://{}/swagger-ui",
+                    server_config.api_endpoint()
+                );
+
+                // Start the server
+                start(server_config).await?;
+            }
+            RunMode::Worker(args) => {
+                // First convert args to config
+                let config = config_from_args(&args)?;
+
+                // Run the worker
+                println!("⚙️  Running real-time indexer with config: {}", args.config_path);
+
+                // Get the current timestamp for real-time indexing start point
+                let current_time = chrono::Utc::now().timestamp() as u64;
+
+                // Create worker from config
+                let worker =
+                    new_realtime_worker_from_config(&config, &processor_factories, None).await?;
+
+                println!("🚀 Starting real-time indexer from current time: {}", current_time);
+                worker.run().await?;
+            }
+            RunMode::Backfill(args) => {
+                // First convert args to config
+                let config = config_from_args(&args)?;
+
+                // Run backfill worker
+                println!("⚙️  Running backfill worker with config: {}", args.config_path);
+                tracing_subscriber::fmt::init();
+
+                // Create backfill worker from config
+                let worker = new_backfill_worker_from_config(&config, &processor_factories).await?;
+
+                println!("🚀 Starting backfill worker...");
+                worker.run().await?;
+            }
             RunMode::BackfillStatus(args) => {
                 if args.processor_name.is_empty() {
                     return Err(anyhow::anyhow!("Processor name is required for backfill status"));
                 }
+
+                // First convert args to config
                 let config = config_from_args(&args.clone().into())?;
 
+                // Create worker from config
                 let worker =
                     new_realtime_worker_from_config(&config, &processor_factories, None).await?;
 
-                // worker.processor_configs.iter().for_each(|p| {
-                //     println!("Processor: {}", p.name());
-                // });
-
-                let backfill_height = get_last_timestamp(&worker.db_pool, &args.processor_name)
-                    .await
-                    .context("Failed to get last timestamp")?;
+                // Get backfill status
+                let backfill_height =
+                    get_last_timestamp(&worker.db_pool, &args.processor_name, args.network)
+                        .await
+                        .context("Failed to get last timestamp")?;
 
                 println!(
                     "Backfill status for processor {}: last timestamp = {}",

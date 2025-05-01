@@ -1,6 +1,7 @@
 pub mod db;
 pub mod errors;
 pub mod models;
+pub mod network;
 pub mod processors;
 pub mod repository;
 pub mod schema;
