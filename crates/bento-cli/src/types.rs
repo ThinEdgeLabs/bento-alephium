@@ -69,6 +69,7 @@ pub struct WorkerConfig {
     pub rpc_url: Option<String>,
     pub network: String,
     pub start: u64,
+    pub stop: Option<u64>,
     pub step: u64,
     pub sync_duration: u64,
     pub workers: Option<u32>,

@@ -78,7 +78,6 @@ async fn new_worker_from_config(
         fetch_strategy,
     )
     .await?;
-
     Ok(worker)
 }
 
@@ -87,11 +86,17 @@ pub async fn new_realtime_worker_from_config(
     processor_factories: &HashMap<String, ProcessorFactory>,
     fetch_strategy: Option<FetchStrategy>,
 ) -> Result<Worker> {
+    let current_time = chrono::Utc::now().timestamp_millis() as u64;
     new_worker_from_config(
         config,
         processor_factories,
         fetch_strategy,
-        Some(SyncOptions { start_ts: None, step: Some(1000), sync_duration: Some(1000) }),
+        Some(SyncOptions {
+            start_ts: current_time,
+            stop_ts: None,
+            step: Some(1000),
+            sync_duration: Some(1000),
+        }),
     )
     .await
 }
@@ -105,7 +110,8 @@ pub async fn new_backfill_worker_from_config(
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
         Some(SyncOptions {
-            start_ts: Some(config.worker.start),
+            start_ts: config.worker.start,
+            stop_ts: config.worker.stop,
             step: Some(config.worker.step),
             sync_duration: Some(config.worker.sync_duration),
         }),
@@ -121,66 +127,6 @@ pub async fn new_server_config_from_config(config: &Config) -> Result<ServerConf
         api_port: config.server.port.parse()?,
     };
     Ok(server_config)
-}
-
-pub async fn run_worker(
-    args: CliArgs,
-    processor_factories: &HashMap<String, ProcessorFactory>,
-) -> Result<()> {
-    println!("⚙️  Running real-time indexer with config: {}", args.config_path);
-
-    // First convert args to config
-    let config = config_from_args(&args)?;
-
-    // Get the current timestamp for real-time indexing start point
-    let current_time = chrono::Utc::now().timestamp() as u64;
-
-    // Then create worker from config
-    let worker = new_realtime_worker_from_config(&config, processor_factories, None).await?;
-
-    // Run the worker
-    println!("🚀 Starting real-time indexer from current time: {}", current_time);
-    worker.run().await?;
-
-    Ok(())
-}
-
-pub async fn run_server(args: CliArgs) -> Result<()> {
-    dotenvy::dotenv().ok();
-    println!("Starting server...");
-
-    // First convert args to config
-    let config = config_from_args(&args)?;
-
-    // Then create server config from config
-    let server_config = new_server_config_from_config(&config).await?;
-
-    println!("Server is ready and running on http://{}", server_config.api_endpoint());
-    println!("Swagger UI is available at http://{}/swagger-ui", server_config.api_endpoint());
-
-    // Start the server
-    start(server_config).await?;
-    Ok(())
-}
-
-pub async fn run_backfill(
-    args: CliArgs,
-    processor_factories: &HashMap<String, ProcessorFactory>,
-) -> Result<()> {
-    println!("⚙️  Running backfill worker with config: {}", args.config_path);
-    tracing_subscriber::fmt::init();
-
-    // First convert args to config
-    let config = config_from_args(&args)?;
-
-    // Then create worker from config
-    let worker = new_backfill_worker_from_config(&config, processor_factories).await?;
-
-    // Run the worker
-    println!("🚀 Starting backfill worker...");
-    worker.run().await?;
-
-    Ok(())
 }
 
 /// Main function to run the command line interface
@@ -244,8 +190,6 @@ pub async fn run_command(
                 // First convert args to config
                 let config = config_from_args(&args)?;
 
-                // Start the server using the config
-                dotenvy::dotenv().ok();
                 println!("Starting server...");
 
                 // Create server config from config
@@ -261,20 +205,17 @@ pub async fn run_command(
                 start(server_config).await?;
             }
             RunMode::Worker(args) => {
-                // First convert args to config
+                tracing_subscriber::fmt::init();
+
                 let config = config_from_args(&args)?;
 
-                // Run the worker
                 println!("⚙️  Running real-time indexer with config: {}", args.config_path);
 
-                // Get the current timestamp for real-time indexing start point
-                let current_time = chrono::Utc::now().timestamp() as u64;
-
-                // Create worker from config
                 let worker =
                     new_realtime_worker_from_config(&config, &processor_factories, None).await?;
 
-                println!("🚀 Starting real-time indexer from current time: {}", current_time);
+                println!("🚀 Starting real-time indexer");
+
                 worker.run().await?;
             }
             RunMode::Backfill(args) => {

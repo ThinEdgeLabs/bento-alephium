@@ -20,7 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         database_url,
         Network::Mainnet,
         None,
-        Some(SyncOptions { start_ts: Some(1716560632750), step: Some(1000), sync_duration: None }),
+        Some(SyncOptions {
+            start_ts: 1716560632750,
+            stop_ts: None,
+            step: Some(1000),
+            sync_duration: None,
+        }),
         None,
     )
     .await?;
