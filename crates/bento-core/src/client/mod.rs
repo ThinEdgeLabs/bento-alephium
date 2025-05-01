@@ -7,7 +7,7 @@ use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::{env, time::Duration};
 #[derive(Clone, Debug)]
 pub enum Network {
-    Development,
+    Devnet,
     Testnet,
     Mainnet,
     Custom(String),
@@ -25,7 +25,7 @@ impl Network {
     /// A string containing the base URL of the network.
     pub fn base_url(&self) -> String {
         match self {
-            Network::Development => {
+            Network::Devnet => {
                 env::var("DEV_NODE_URL").unwrap_or_else(|_| "http://127.0.0.1:12973".to_owned())
             }
             Network::Testnet => env::var("TESTNET_NODE_URL")
@@ -41,7 +41,7 @@ impl Default for Network {
     fn default() -> Self {
         env::var("ENVIRONMENT")
             .map(|env| match env.as_str() {
-                "development" => Network::Development,
+                "development" => Network::Devnet,
                 "testnet" => Network::Testnet,
                 "mainnet" => Network::Mainnet,
                 _ => Network::Mainnet,

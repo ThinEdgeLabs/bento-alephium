@@ -1,2 +1,4 @@
 pub mod fetch;
-pub mod worker_v2;
+pub mod pipeline;
+pub mod stage;
+pub mod worker;

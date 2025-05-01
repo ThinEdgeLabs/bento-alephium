@@ -6,8 +6,8 @@ use clap::Parser;
 
 use anyhow::{Context, Result};
 use bento_core::{
-    client::Network, config::ProcessorConfig, new_db_pool, worker_v2::SyncOptions,
-    workers::worker_v2::Worker, ProcessorFactory,
+    client::Network, config::ProcessorConfig, new_db_pool, worker::SyncOptions,
+    workers::worker::Worker, ProcessorFactory,
 };
 use bento_server::{start, Config as ServerConfig};
 use constants::{DEFAULT_BLOCK_PROCESSOR, DEFAULT_EVENT_PROCESSOR, DEFAULT_TX_PROCESSOR};
@@ -18,10 +18,12 @@ pub fn config_from_args(args: &CliArgs) -> Result<Config> {
     let config: Config = toml::from_str(&config_str)?;
     Ok(config)
 }
-pub async fn new_worker_from_config(
+
+async fn new_job_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
     fetch_strategy: Option<FetchStrategy>,
+    sync_options: Option<SyncOptions>,
 ) -> Result<Worker> {
     // Get the worker configuration
     let worker_config = &config.worker;
@@ -52,8 +54,12 @@ pub async fn new_worker_from_config(
         processors.push(ProcessorConfig::TxProcessor);
     }
 
-    // Determine network type (default to Testnet if not specified)
-    let network = Network::Testnet;
+    let network = match worker_config.rpc_url.as_str() {
+        "mainnet" => Network::Mainnet,
+        "testnet" => Network::Testnet,
+        "devnet" => Network::Devnet,
+        rpc_url => Network::Custom(rpc_url.to_string()),
+    };
 
     // Create and return the worker
     let worker = Worker::new(
@@ -61,12 +67,7 @@ pub async fn new_worker_from_config(
         worker_config.database_url.clone(),
         network,
         None, // Custom DB Schema
-        Some(SyncOptions {
-            start_ts: Some(config.worker.start),
-            step: Some(config.worker.step),
-            back_step: None,
-            sync_duration: Some(config.worker.sync_duration),
-        }),
+        sync_options,
         fetch_strategy,
     )
     .await?;
@@ -74,21 +75,59 @@ pub async fn new_worker_from_config(
     Ok(worker)
 }
 
+pub async fn new_realtime_worker_from_config(
+    config: &Config,
+    processor_factories: &HashMap<String, ProcessorFactory>,
+    fetch_strategy: Option<FetchStrategy>,
+) -> Result<Worker> {
+    new_job_from_config(
+        config,
+        processor_factories,
+        fetch_strategy,
+        Some(SyncOptions {
+            start_ts: None,
+            step: Some(1000),
+            back_step: None,
+            sync_duration: Some(1000),
+        }),
+    )
+    .await
+}
+
+pub async fn new_backfill_worker_from_config(
+    config: &Config,
+    processor_factories: &HashMap<String, ProcessorFactory>,
+) -> Result<Worker> {
+    new_job_from_config(
+        config,
+        processor_factories,
+        Some(FetchStrategy::Parallel { num_workers: 10 }),
+        Some(SyncOptions {
+            start_ts: Some(config.worker.start),
+            step: Some(config.worker.step),
+            back_step: None,
+            sync_duration: Some(config.worker.sync_duration),
+        }),
+    )
+    .await
+}
+
 pub async fn run_worker(
     args: CliArgs,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<()> {
-    println!("⚙️  Running worker with config: {}", args.config_path);
+    println!("⚙️  Running real-time indexer with config: {}", args.config_path);
 
     // Load config from args
     let config = config_from_args(&args)?;
 
-    // Create worker from config
-    let worker =
-        new_worker_from_config(&config, processor_factories, Some(FetchStrategy::Simple)).await?;
+    // Get the current timestamp for real-time indexing start point
+    let current_time = chrono::Utc::now().timestamp() as u64;
+
+    let worker = new_realtime_worker_from_config(&config, processor_factories, None).await?;
 
     // Run the worker
-    println!("🚀 Starting worker...");
+    println!("🚀 Starting real-time indexer from current time: {}", current_time);
     worker.run().await?;
 
     Ok(())
@@ -120,22 +159,17 @@ pub async fn run_backfill(
     args: CliArgs,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<()> {
-    println!("⚙️  Running backfilling with config: {}", args.config_path);
+    println!("⚙️  Running backfill worker with config: {}", args.config_path);
     tracing_subscriber::fmt::init();
 
     // Load config from args
     let config = config_from_args(&args)?;
 
     // Create worker from config
-    let worker = new_worker_from_config(
-        &config,
-        processor_factories,
-        Some(FetchStrategy::Parallel { num_workers: 10 }),
-    )
-    .await?;
+    let worker = new_backfill_worker_from_config(&config, processor_factories).await?;
 
     // Run the worker
-    println!("🚀 Starting worker...");
+    println!("🚀 Starting backfill worker...");
     worker.run().await?;
 
     Ok(())
@@ -207,7 +241,8 @@ pub async fn run_command(
                 }
                 let config = config_from_args(&args.clone().into())?;
 
-                let worker = new_worker_from_config(&config, &processor_factories, None).await?;
+                let worker =
+                    new_realtime_worker_from_config(&config, &processor_factories, None).await?;
 
                 // worker.processor_configs.iter().for_each(|p| {
                 //     println!("Processor: {}", p.name());
