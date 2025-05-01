@@ -137,16 +137,10 @@ impl Worker {
 
                 let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
 
-                let last_ts = get_last_timestamp(
-                    &pool_clone,
-                    processor_name,
-                    client_clone.clone().network.clone().into(),
-                )
-                .await?;
-                let mut current_ts =
-                    sync_opts_clone.start_ts.unwrap_or(0).max(last_ts.try_into().unwrap());
+                let mut current_ts = sync_opts_clone.start_ts;
                 let step = sync_opts_clone.step.unwrap_or(1000);
-                let sync_duration = Duration::from_secs(sync_opts_clone.sync_duration.unwrap_or(1));
+                let sync_duration =
+                    Duration::from_millis(sync_opts_clone.sync_duration.unwrap_or(1000));
 
                 loop {
                     let to_ts = current_ts + step;
@@ -154,6 +148,12 @@ impl Worker {
                         from_ts: current_ts.try_into().unwrap(),
                         to_ts: to_ts.try_into().unwrap(),
                     };
+                    tracing::debug!(
+                        processor_name = processor_name,
+                        "Fetching blocks from {} to {}...",
+                        current_ts,
+                        to_ts
+                    );
                     let batches = fetch_parallel(
                         client_clone.clone(),
                         range,
@@ -175,9 +175,9 @@ impl Worker {
                             to_ts.try_into().unwrap(),
                         )
                         .await?;
-                        current_ts = to_ts + 1;
+                        current_ts = to_ts + step;
                     }
-
+                    tracing::debug!("Sleeping for {:?}...", sync_duration);
                     tokio_sleep(sync_duration).await;
                 }
 
@@ -216,7 +216,8 @@ impl Worker {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {
-    pub start_ts: Option<u64>,
+    pub start_ts: u64,
+    pub stop_ts: Option<u64>,
     pub step: Option<u64>,
     pub sync_duration: Option<u64>,
 }
