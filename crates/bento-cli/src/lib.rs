@@ -163,8 +163,8 @@ pub async fn new_server_config_from_config(config: &Config) -> Result<ServerConf
 /// # Examples
 ///
 /// ```
-/// let processor_factories = HashMap::new();
-/// run_command(processor_factories, true).await?;
+// / let processor_factories = HashMap::new();
+// / run_command(processor_factories, true).await?;
 /// ```
 pub async fn run_command(
     processor_factories: HashMap<String, ProcessorFactory>,
