@@ -1,58 +1,67 @@
-# Bento Alephium - Custom Blockchain Data Processor Framework
+# Bento Alephium - Blockchain Indexer Framework
 
-This framework allows you to create custom processors for indexing and processing Alephium blockchain data. The framework provides a flexible architecture for handling different types of blockchain events and storing them in a PostgreSQL database using Diesel ORM.
+Bento is a powerful indexer framework for the Alephium blockchain, designed to make it easy to build custom processors that track and store blockchain events. The framework provides a flexible, type-safe architecture for processing different types of contract events and persisting them in a PostgreSQL database using Diesel ORM.
 
-## Example: Lending Marketplace Processor
+## Key Features
 
-The Lending Marketplace Processor demonstrates how to create a custom processor that tracks lending contract events. It processes two types of events:
-1. Loan Actions (Create, Cancel, Pay, Accept, Liquidate)
-2. Loan Details (lending and collateral information)
+- **Modular Architecture**: Create custom processors for different contract types
+- **Type-Safe Data Handling**: Leverages Rust's type system with Diesel ORM
+- **Flexible Event Processing**: Process events by contract address and event type
+- **Parallel Block Processing**: Configurable concurrent execution strategies
+- **Custom Output Types**: Define specialized data models for your specific needs
+- **Factory Pattern Support**: Dynamic processor creation with dependency injection
 
-### Core Components
+## Getting Started
 
-1. **Data Models**: Database tables represented as Rust structs using Diesel ORM
-   - `LoanActionModel`: Tracks loan lifecycle events
-   - `LoanDetailModel`: Stores loan terms and conditions
+### Prerequisites
 
-2. **Custom Output Type**: Define how processor output is handled
-   ```rust
-   #[derive(Debug, Clone)]
-   pub struct LendingContractOutput {
-       pub loan_actions: Vec<LoanActionModel>,
-       pub loan_details: Vec<LoanDetailModel>,
-   }
+- Rust and Cargo
+- PostgreSQL database
+- Access to an Alephium node (Mainnet or Testnet)
 
-   impl CustomProcessorOutput for LendingContractOutput {
-       fn as_any(&self) -> &dyn std::any::Any {
-           self
-       }
+### Installation
 
-       fn clone_box(&self) -> Box<dyn CustomProcessorOutput> {
-           Box::new(self.clone())
-       }
-   }
-   ```
+Add Bento to your Cargo.toml:
 
-3. **Event Types**: Enumeration of supported contract events
-   ```rust
-   #[derive(Debug, Clone, Copy, PartialEq, Eq, FromSqlRow, DbEnum, Serialize, AsExpression)]
-   #[diesel(sql_type = SmallInt)]
-   pub enum LoanActionType {
-       LoanCreated,
-       LoanCancelled,
-       LoanPaid,
-       LoanAccepted,
-       LoanLiquidated,
-   }
-   ```
+```toml
+[dependencies]
+bento_core = "0.1.0"
+bento_trait = "0.1.0"
+bento_types = "0.1.0"
+bento_cli = "0.1.0"
+diesel = { version = "2.0.0", features = ["postgres", "chrono", "serde_json"] }
+diesel-async = { version = "0.3.0", features = ["postgres", "deadpool"] }
+diesel_enum = "0.1.0"
+```
 
-### Implementation Guide
+### Basic Usage
 
-1. **Define Your Data Models**
+Create a `main.rs` file that registers your custom processors:
+
+```rust
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let mut processor_factories = HashMap::new();
+    processor_factories.insert("lending".to_string(), lending_example::processor_factory());
+    bento_cli::run_command(processor_factories, true).await?;
+    Ok(())
+}
+```
+
+## Creating a Custom Processor
+
+The framework allows you to create specialized processors for different contract types. Here's a walkthrough using the Lending Marketplace Processor example:
+
+### 1. Define Your Data Models
+
+First, define the database models that represent the data you want to store:
 
 ```rust
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = schema::loan_actions)]
+#[diesel(table_name = bento_types::schema::loan_actions)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanActionModel {
     loan_subcontract_id: String,
     loan_id: Option<BigDecimal>,
@@ -62,7 +71,8 @@ pub struct LoanActionModel {
 }
 
 #[derive(Queryable, Selectable, Insertable, Debug, Clone, Serialize, AsChangeset)]
-#[diesel(table_name = schema::loan_details)]
+#[diesel(table_name = bento_types::schema::loan_details)]
+#[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct LoanDetailModel {
     loan_subcontract_id: String,
     lending_token_id: String,
@@ -75,7 +85,60 @@ pub struct LoanDetailModel {
 }
 ```
 
-2. **Create Your Processor**
+### 2. Define Event Types
+
+Create enums for the different event types your processor will handle:
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromSqlRow, DbEnum, Serialize, AsExpression)]
+#[diesel(sql_type = SmallInt)]
+pub enum LoanActionType {
+    LoanCreated,
+    LoanCancelled,
+    LoanPaid,
+    LoanAccepted,
+    LoanLiquidated,
+}
+
+impl LoanActionType {
+    pub fn from_event_index(event_index: i32) -> Option<Self> {
+        match event_index {
+            2 => Some(Self::LoanCreated),
+            3 => Some(Self::LoanCancelled),
+            4 => Some(Self::LoanPaid),
+            5 => Some(Self::LoanAccepted),
+            6 => Some(Self::LoanLiquidated),
+            _ => None,
+        }
+    }
+}
+```
+
+### 3. Create a Custom Output Type
+
+Define a custom output type that will hold the processed data:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct LendingContractOutput {
+    pub loan_actions: Vec<LoanActionModel>,
+    pub loan_details: Vec<LoanDetailModel>,
+}
+
+impl CustomProcessorOutput for LendingContractOutput {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn CustomProcessorOutput> {
+        Box::new(self.clone())
+    }
+}
+```
+
+### 4. Implement Your Processor
+
+Create a processor struct and implement the `ProcessorTrait`:
 
 ```rust
 pub struct LendingContractProcessor {
@@ -84,7 +147,12 @@ pub struct LendingContractProcessor {
 }
 
 impl LendingContractProcessor {
-    pub fn new(connection_pool: Arc<DbPool>, contract_address: String) -> Self {
+    pub fn new(connection_pool: Arc<DbPool>, args: serde_json::Value) -> Self {
+        let contract_address = args
+            .get("contract_address")
+            .and_then(|v| v.as_str())
+            .unwrap_or_else(|| panic!("Missing contract address argument"))
+            .to_string();
         Self { connection_pool, contract_address }
     }
 }
@@ -92,7 +160,7 @@ impl LendingContractProcessor {
 #[async_trait]
 impl ProcessorTrait for LendingContractProcessor {
     fn name(&self) -> &'static str {
-        "lending_contract_processor"
+        "lending"
     }
 
     fn connection_pool(&self) -> &Arc<DbPool> {
@@ -108,12 +176,6 @@ impl ProcessorTrait for LendingContractProcessor {
         // Process blocks and convert to models
         let (loan_actions, loan_details) = convert_to_model(blocks, &self.contract_address);
 
-        tracing::info!(
-            "Processed {} loan actions and {} loan details",
-            loan_actions.len(),
-            loan_details.len()
-        );
-
         // Return custom output
         Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput { 
             loan_actions, 
@@ -125,7 +187,7 @@ impl ProcessorTrait for LendingContractProcessor {
     async fn store_output(&self, output: ProcessorOutput) -> Result<()> {
         if let ProcessorOutput::Custom(custom) = output {
             if let Some(lending_output) = custom.as_any().downcast_ref::<LendingContractOutput>() {
-                // Store loan actions
+                // Store data in database
                 if !lending_output.loan_actions.is_empty() {
                     insert_loan_actions_to_db(
                         self.connection_pool.clone(), 
@@ -133,7 +195,6 @@ impl ProcessorTrait for LendingContractProcessor {
                     ).await?;
                 }
 
-                // Store loan details
                 if !lending_output.loan_details.is_empty() {
                     insert_loan_details_to_db(
                         self.connection_pool.clone(), 
@@ -147,123 +208,148 @@ impl ProcessorTrait for LendingContractProcessor {
 }
 ```
 
-3. **Create Factory Function and Register Processor**
+### 5. Create a Factory Function
 
-The factory function is a crucial part that creates and configures your processor. It's used by the worker to instantiate your processor with the correct configuration:
-
-```rust
-// Factory function that creates your processor instance
-fn register_lending_contract(
-    pool: Arc<DbPool>, 
-    args: Option<serde_json::Value>
-) -> Box<dyn ProcessorTrait> {
-    // Extract contract address from args
-    let contract_address = if let Some(args) = args {
-        args.get("contract_address")
-            .and_then(|v| v.as_str())
-            .unwrap()
-            .to_string()
-    } else {
-        panic!("Missing contract address argument")
-    };
-
-    // Create and return the processor
-    Box::new(LendingContractProcessor::new(pool, contract_address))
-}
-
-// Register the processor with the worker
-let processor_config = ProcessorConfig::Custom { 
-    name: "lending processor".to_string(),
-    factory: register_lending_contract,  // Pass the factory function
-    args: Some(serde_json::json!({
-        "contract_address": "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"
-    }))
-};
-
-// Create worker with the processor
-let worker = Worker::new(
-    vec![processor_config],  // Can register multiple processors
-    database_url,
-    Network::Testnet,
-    None,
-    Some(SyncOptions {
-        start_ts: Some(1716560632750),
-        step: Some(1800000 * 10),
-        back_step: None,
-        sync_duration: None,
-    }),
-    Some(FetchStrategy::Parallel { num_workers: 10 }),
-).await?;
-```
-
-The factory function pattern allows for:
-- Dynamic processor creation based on configuration
-- Dependency injection (database pool)
-- Configuration validation at startup
-- Multiple processor instances with different configurations
-- Clean separation between processor creation and usage
-
-### Running the Processor
+Define a factory function that creates your processor instance:
 
 ```rust
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenvy::dotenv().ok();
-    tracing_subscriber::fmt().init();
-
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::Custom { 
-        name: "lending processor".to_string(),
-        factory: register_lending_contract,
-        args: Some(serde_json::json!({
-            "contract_address": "yuF1Sum4ricLFBc86h3RdjFsebR7ZXKBHm2S5sZmVsiF"
-        }))
-    };
-
-    let worker = Worker::new(
-        vec![processor_config],
-        database_url,
-        Network::Testnet,
-        None,
-        Some(SyncOptions {
-            start_ts: Some(1716560632750),
-            step: Some(1800000 * 10), // Process blocks in 5-hour chunks
-            back_step: None,
-            sync_duration: None,
-        }),
-        Some(FetchStrategy::Parallel { num_workers: 10 }),
-    ).await?;
-
-    worker.run().await?;
-    Ok(())
+pub fn processor_factory() -> ProcessorFactory {
+    |db_pool, args: Option<serde_json::Value>| {
+        Box::new(LendingContractProcessor::new(db_pool, args.unwrap_or_default()))
+    }
 }
 ```
 
-### Best Practices
+### 6. Event Processing Functions
 
-1. **Event Processing**
-   - Validate event field count before processing
-   - Use proper type conversion with error handling
-   - Filter events by contract address
-   - Handle different event types appropriately
+Implement functions to handle specific event types:
 
-2. **Custom Output Handling**
-   - Implement `CustomProcessorOutput` trait for your output type
-   - Use `ProcessorOutput::Custom` to wrap your output
-   - Override `store_output` to handle custom data storage
-   - Use proper type downcasting with error handling
+```rust
+fn handle_loan_action_event(
+    models: &mut Vec<LoanActionModel>,
+    event: &ContractEventByBlockHash,
+    action: LoanActionType,
+) {
+    if event.fields.len() < 3 {
+        tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
+        return;
+    }
 
-3. **Error Handling**
-   - Use custom error types for specific failures
-   - Implement comprehensive logging
-   - Handle all potential error cases
-   - Validate input data thoroughly
+    match action {
+        LoanActionType::LoanCreated => {
+            models.push(LoanActionModel {
+                loan_subcontract_id: event.fields[0].value.clone().to_string(),
+                action_type: action,
+                by: event.fields[2].value.clone().to_string(),
+                timestamp: timestamp_millis_to_naive_datetime(
+                    event.fields[3].value.as_str().unwrap().parse::<i64>().unwrap(),
+                ),
+                loan_id: Some(
+                    BigDecimal::from_str(event.fields[1].value.as_str().unwrap()).unwrap(),
+                ),
+            });
+        }
+        _ => {
+            // Handle other action types
+            // ...
+        }
+    }
+}
+```
 
-4. **Configuration**
-   - Use environment variables for database configuration
-   - Pass contract address through processor args
-   - Configure appropriate sync options
+## Running Your Indexer
+
+Use the Bento CLI to run your indexer:
+
+```bash
+DATABASE_URL=postgres://username:password@localhost/mydb cargo run -- sync --network testnet
+```
+
+The CLI supports various commands and options:
+
+```bash
+# Start indexing from a specific timestamp
+cd examples/lending-indexer
+
+# Start the backfill process
+cargo run run backfill --network testnet
+
+# Start the real-time sync
+cargo run run worker --network testnet  
+
+# Start the server
+cargo run run server
+
+# Query the latest timestamp
+cargo run run backfill-status -processor-name lending_processor
+
+```
+
+## Configuration
+
+Configuration is handled through environment variables and command-line arguments:
+
+1. **Database**: Set via `DATABASE_URL` environment variable
+2. **Network**: Choose between `mainnet` and `testnet`
+3. **Sync Options**: Configure start time, step size, etc.
+4. **Processor Args**: Pass contract addresses and other parameters
+
+Example `.env` file:
+
+```
+DATABASE_URL=postgres://username:password@localhost/bento_db
+RUST_LOG=info
+```
+
+## Best Practices
+
+### Error Handling
+
+Use proper error types and handling:
+
+```rust
+#[derive(Debug, thiserror::Error)]
+#[error("CustomError: {msg}, {status}")]
+pub struct CustomError {
+    msg: String,
+    status: u16,
+}
+
+impl CustomError {
+    fn not_found(msg: String) -> Self {
+        Self { msg, status: 404 }
+    }
+}
+```
+
+### Event Validation
+
+Always validate event fields before processing:
+
+```rust
+if event.fields.len() < expected_length {
+    tracing::warn!("Invalid event fields length: {}, skipping", event.fields.len());
+    return;
+}
+```
+
+### Type Conversion
+
+Handle type conversions safely:
+
+```rust
+BigDecimal::from_f64(
+    event.fields[3].value.as_str()
+        .and_then(|s| s.parse::<f64>().ok())
+        .unwrap_or_default(),
+)
+.unwrap_or_default()
+```
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
