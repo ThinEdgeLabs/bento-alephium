@@ -218,6 +218,5 @@ impl Worker {
 pub struct SyncOptions {
     pub start_ts: Option<u64>,
     pub step: Option<u64>,
-    pub back_step: Option<u64>,
     pub sync_duration: Option<u64>,
 }

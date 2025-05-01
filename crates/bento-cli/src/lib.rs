@@ -91,12 +91,7 @@ pub async fn new_realtime_worker_from_config(
         config,
         processor_factories,
         fetch_strategy,
-        Some(SyncOptions {
-            start_ts: None,
-            step: Some(1000),
-            back_step: None,
-            sync_duration: Some(1000),
-        }),
+        Some(SyncOptions { start_ts: None, step: Some(1000), sync_duration: Some(1000) }),
     )
     .await
 }
@@ -112,7 +107,6 @@ pub async fn new_backfill_worker_from_config(
         Some(SyncOptions {
             start_ts: Some(config.worker.start),
             step: Some(config.worker.step),
-            back_step: None,
             sync_duration: Some(config.worker.sync_duration),
         }),
     )

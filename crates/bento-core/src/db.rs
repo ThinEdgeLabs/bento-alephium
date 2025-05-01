@@ -84,6 +84,7 @@ pub async fn new_db_pool(
         .max_size(max_pool_size.unwrap_or(DEFAULT_MAX_POOL_SIZE))
         .build(config)
         .await?;
+
     Ok(Arc::new(pool))
 }
 
