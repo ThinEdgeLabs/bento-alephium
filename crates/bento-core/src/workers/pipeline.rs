@@ -4,7 +4,7 @@ use crate::Client;
 use anyhow::Result;
 use bento_trait::{processor::DynProcessor, stage::StageHandler};
 use bento_types::{BlockBatch, DbPool, StageMessage};
-use tokio::{sync::mpsc, time::sleep as tokio_sleep};
+use tokio::sync::mpsc;
 
 use super::stage::{ProcessorStage, StorageStage};
 

@@ -17,7 +17,7 @@ use bento_types::{
 use anyhow::Result;
 
 use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc, time::sleep as tokio_sleep};
+use tokio::time::sleep as tokio_sleep;
 
 use super::{fetch::fetch_parallel, pipeline::Pipeline};
 
