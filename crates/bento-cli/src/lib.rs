@@ -115,10 +115,10 @@ pub async fn new_backfill_worker_from_config(
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
         Some(SyncOptions {
-            start_ts: config.worker.start,
-            stop_ts: config.worker.stop,
+            start_ts: config.backfill.start,
+            stop_ts: Some(config.backfill.stop),
             step: Some(config.worker.step),
-            sync_duration: Some(config.worker.sync_duration),
+            sync_duration: Some(config.backfill.request_interval),
         }),
     )
     .await
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(config.server.port, "8080");
 
         assert_eq!(config.backfill.start, 500);
-        assert_eq!(config.backfill.end, 1500);
+        assert_eq!(config.backfill.stop, 1500);
 
         // Check that the processors were loaded
         assert!(config.processors.is_some());
@@ -393,7 +393,7 @@ mod tests {
         assert_eq!(config.server.port, "3000");
 
         assert_eq!(config.backfill.start, 500);
-        assert_eq!(config.backfill.end, 1500);
+        assert_eq!(config.backfill.stop, 1500);
     }
 
     #[test]

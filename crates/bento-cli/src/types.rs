@@ -89,7 +89,8 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BackfillConfig {
     pub start: u64,
-    pub end: u64,
+    pub stop: u64,
+    pub request_interval: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
