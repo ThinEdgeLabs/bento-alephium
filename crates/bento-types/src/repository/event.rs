@@ -10,10 +10,10 @@ use diesel_async::RunQueryDsl;
 /// Insert events into the database.
 pub async fn insert_events_to_db(db: Arc<DbPool>, events: Vec<EventModel>) -> Result<()> {
     // Log the start with event count
-    tracing::info!("Starting DB insertion process for {} events", events.len());
+    tracing::debug!("Starting DB insertion process for {} events", events.len());
 
     // 1. Acquire connection with timeout
-    tracing::info!("Attempting to acquire DB connection");
+    tracing::debug!("Attempting to acquire DB connection");
     let conn_future = db.get();
     let mut conn = match tokio::time::timeout(Duration::from_secs(5), conn_future).await {
         Ok(result) => {
@@ -28,10 +28,18 @@ pub async fn insert_events_to_db(db: Arc<DbPool>, events: Vec<EventModel>) -> Re
     };
 
     // Now try the full batch
-    tracing::info!("Executing full insert query for {} events", events.len());
+    tracing::debug!("Executing full insert query for {} events", events.len());
     match tokio::time::timeout(
         Duration::from_secs(30), // Increased timeout for larger batches
-        insert_into(crate::schema::events::table).values(&events).execute(&mut conn),
+        insert_into(crate::schema::events::table)
+            .values(&events)
+            .on_conflict((
+                crate::schema::events::tx_id,
+                crate::schema::events::contract_address,
+                crate::schema::events::event_index,
+            ))
+            .do_nothing()
+            .execute(&mut conn),
     )
     .await
     {
