@@ -21,8 +21,8 @@ pub fn config_from_args(args: &CliArgs) -> Result<Config> {
     let mut config: Config = toml::from_str(&config_str)?;
 
     // Override the network in the config with the one from args
-    if !args.network.is_empty() {
-        config.worker.network = args.network.clone();
+    if args.network.is_some() {
+        config.worker.network = args.network.clone().unwrap();
     }
     Ok(config)
 }
@@ -242,6 +242,8 @@ pub async fn run_command(
                 worker.run().await?;
             }
             RunMode::BackfillStatus(args) => {
+                println!("Running backfill status...");
+
                 if args.processor_name.is_empty() {
                     return Err(anyhow::anyhow!("Processor name is required for backfill status"));
                 }
@@ -323,7 +325,7 @@ mod tests {
         // Create CLI args with the path to our test config
         let args = CliArgs {
             config_path: config_path.to_string_lossy().to_string(),
-            network: "testnet".to_string(),
+            network: Some("testnet".to_string()),
         };
 
         // Call the function we're testing
@@ -450,7 +452,7 @@ mod tests {
         // Create CLI args with the path to our test config
         let args = CliArgs {
             config_path: config_path.to_string_lossy().to_string(),
-            network: "testnet".to_string(),
+            network: Some("testnet".to_string()),
         };
 
         // Call the function we're testing - it should fail
@@ -463,7 +465,7 @@ mod tests {
         // Create CLI args with a non-existent config path
         let args = CliArgs {
             config_path: "non_existent_config.toml".to_string(),
-            network: "testnet".to_string(),
+            network: Some("testnet".to_string()),
         };
 
         // Call the function we're testing - it should fail
