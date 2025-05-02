@@ -48,7 +48,7 @@ impl Worker {
 
         let mut current_ts = self.sync_opts.start_ts;
         let step = self.sync_opts.step.unwrap_or(1000);
-        let sync_duration = Duration::from_millis(self.sync_opts.sync_duration.unwrap_or(1000));
+        let request_interval = Duration::from_millis(self.sync_opts.request_interval);
 
         loop {
             let to_ts = current_ts + step;
@@ -69,9 +69,9 @@ impl Worker {
                         tracing::error!(
                             error = ?e,
                             "Failed to fetch blocks, retrying in {:?}",
-                            sync_duration
+                            request_interval
                         );
-                        tokio_sleep(sync_duration).await;
+                        tokio_sleep(request_interval).await;
                         continue;
                     }
                 };
@@ -157,8 +157,8 @@ impl Worker {
                 }
             }
 
-            tracing::debug!("Sleeping for {:?}...", sync_duration);
-            tokio_sleep(sync_duration).await;
+            tracing::debug!("Sleeping for {:?}...", request_interval);
+            tokio_sleep(request_interval).await;
         }
 
         Ok(())
@@ -184,5 +184,5 @@ pub struct SyncOptions {
     pub start_ts: u64,
     pub stop_ts: Option<u64>,
     pub step: Option<u64>,
-    pub sync_duration: Option<u64>,
+    pub request_interval: u64,
 }

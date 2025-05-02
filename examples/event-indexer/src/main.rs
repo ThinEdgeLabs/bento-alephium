@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             start_ts: 1716560632750,
             stop_ts: None,
             step: Some(1000),
-            sync_duration: None,
+            request_interval: 1000,
         }),
         None,
     )

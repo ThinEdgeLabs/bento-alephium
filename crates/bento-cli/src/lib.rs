@@ -100,7 +100,7 @@ pub async fn new_realtime_worker_from_config(
             start_ts: current_time,
             stop_ts: None,
             step: Some(1000),
-            sync_duration: Some(1000),
+            request_interval: config.worker.request_interval,
         }),
     )
     .await
@@ -118,7 +118,7 @@ pub async fn new_backfill_worker_from_config(
             start_ts: config.backfill.start,
             stop_ts: Some(config.backfill.stop),
             step: Some(config.worker.step),
-            sync_duration: Some(config.backfill.request_interval),
+            request_interval: config.backfill.request_interval,
         }),
     )
     .await
@@ -337,7 +337,7 @@ mod tests {
         assert_eq!(config.worker.start, 1000);
         assert_eq!(config.worker.stop, Some(2000));
         assert_eq!(config.worker.step, 100);
-        assert_eq!(config.worker.sync_duration, 500);
+        assert_eq!(config.worker.request_interval, 500);
 
         assert_eq!(config.server.port, "8080");
 
@@ -388,7 +388,7 @@ mod tests {
         assert_eq!(config.worker.start, 1000);
         assert_eq!(config.worker.stop, None);
         assert_eq!(config.worker.step, 100);
-        assert_eq!(config.worker.sync_duration, 500);
+        assert_eq!(config.worker.request_interval, 500);
 
         assert_eq!(config.server.port, "3000");
 

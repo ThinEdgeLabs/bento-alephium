@@ -76,7 +76,7 @@ pub struct WorkerConfig {
     pub start: u64,
     pub stop: Option<u64>,
     pub step: u64,
-    pub sync_duration: u64,
+    pub request_interval: u64,
     pub workers: Option<u32>,
     pub chunk_size: Option<u32>,
 }
