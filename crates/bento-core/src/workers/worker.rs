@@ -3,94 +3,17 @@ use crate::{
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
 };
-use bento_trait::{processor::DynProcessor, stage::StageHandler};
 use bento_types::{
-    network::Network,
-    processors::ProcessorOutput,
-    repository::{
-        insert_blocks_to_db, insert_events_to_db, insert_txs_to_db,
-        processor_status::{get_last_timestamp, update_last_timestamp},
-    },
-    BlockRange, FetchStrategy, StageMessage,
+    network::Network, repository::processor_status::update_last_timestamp, BlockRange,
+    FetchStrategy,
 };
 
 use anyhow::Result;
 
+use super::{fetch::fetch_parallel, pipeline::Pipeline};
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep as tokio_sleep;
 
-use super::{fetch::fetch_parallel, pipeline::Pipeline};
-
-pub struct ProcessorStage {
-    processor: DynProcessor,
-}
-
-impl ProcessorStage {
-    pub fn new(processor: DynProcessor) -> Self {
-        Self { processor }
-    }
-}
-
-#[async_trait::async_trait]
-impl StageHandler for ProcessorStage {
-    async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
-        match msg {
-            StageMessage::Batch(batch) => {
-                let output = self
-                    .processor
-                    .process_blocks(batch.range.from_ts, batch.range.to_ts, batch.blocks)
-                    .await?;
-                Ok(StageMessage::Processed(output))
-            }
-            _ => Ok(msg),
-        }
-    }
-}
-
-pub struct StorageStage {
-    db_pool: Arc<DbPool>,
-}
-
-impl StorageStage {
-    pub fn new(db_pool: Arc<DbPool>) -> Self {
-        Self { db_pool }
-    }
-}
-
-#[async_trait::async_trait]
-impl StageHandler for StorageStage {
-    async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
-        match msg {
-            StageMessage::Processed(output) => {
-                match output {
-                    ProcessorOutput::Block(blocks) => {
-                        if !blocks.is_empty() {
-                            insert_blocks_to_db(self.db_pool.clone(), blocks).await?;
-                        }
-                    }
-                    ProcessorOutput::Event(events) => {
-                        if !events.is_empty() {
-                            insert_events_to_db(self.db_pool.clone(), events).await?;
-                        }
-                    }
-                    ProcessorOutput::Tx(txs) => {
-                        if !txs.is_empty() {
-                            insert_txs_to_db(self.db_pool.clone(), txs).await?;
-                        }
-                    }
-                    ProcessorOutput::Custom(_) => {
-                        // Custom processor outputs need to handle their own storage
-                        tracing::info!(
-                            "Custom processor output received - storage handled by processor"
-                        );
-                    }
-                }
-                Ok(StageMessage::Complete)
-            }
-            _ => Ok(msg),
-        }
-    }
-}
 pub struct Worker {
     pub db_pool: Arc<DbPool>,
     pub client: Arc<Client>,
@@ -122,78 +45,120 @@ impl Worker {
 
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
-        let mut handles = Vec::new();
 
-        for processor_config in self.processor_configs.clone() {
-            let pool_clone = self.db_pool.clone();
-            let client_clone = self.client.clone();
-            let fetch_strategy_clone = self.fetch_strategy.clone();
-            let sync_opts_clone = self.sync_opts;
-            let processor_config = processor_config.clone();
+        let mut current_ts = self.sync_opts.start_ts;
+        let step = self.sync_opts.step.unwrap_or(1000);
+        let sync_duration = Duration::from_millis(self.sync_opts.sync_duration.unwrap_or(1000));
 
-            let handle = tokio::spawn(async move {
-                let processor = processor_config.build_processor(pool_clone.clone());
-                let processor_name = processor.name();
+        loop {
+            let to_ts = current_ts + step;
+            let range = BlockRange {
+                from_ts: current_ts.try_into().unwrap(),
+                to_ts: to_ts.try_into().unwrap(),
+            };
 
-                let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
+            tracing::info!("Fetching blocks from {} to {}...", current_ts, to_ts);
 
-                let mut current_ts = sync_opts_clone.start_ts;
-                let step = sync_opts_clone.step.unwrap_or(1000);
-                let sync_duration =
-                    Duration::from_millis(sync_opts_clone.sync_duration.unwrap_or(1000));
-
-                loop {
-                    let to_ts = current_ts + step;
-                    let range = BlockRange {
-                        from_ts: current_ts.try_into().unwrap(),
-                        to_ts: to_ts.try_into().unwrap(),
-                    };
-                    tracing::debug!(
-                        processor_name = processor_name,
-                        "Fetching blocks from {} to {}...",
-                        current_ts,
-                        to_ts
-                    );
-                    let batches = fetch_parallel(
-                        client_clone.clone(),
-                        range,
-                        fetch_strategy_clone.num_workers(),
-                    )
-                    .await?;
-                    if let Err(err) = pipeline.run(batches).await {
+            // Fetch blocks once for all processors
+            let batches =
+                match fetch_parallel(self.client.clone(), range, self.fetch_strategy.num_workers())
+                    .await
+                {
+                    Ok(b) => b,
+                    Err(e) => {
                         tracing::error!(
-                            processor_name = processor_name,
-                            error = ?err,
-                            "Pipeline execution failed, retrying in {:?}",
+                            error = ?e,
+                            "Failed to fetch blocks, retrying in {:?}",
                             sync_duration
                         );
-                    } else {
-                        update_last_timestamp(
-                            &pool_clone,
-                            processor_name,
-                            (client_clone.network.clone()).into(),
-                            to_ts.try_into().unwrap(),
-                        )
-                        .await?;
-                        current_ts = to_ts + step;
+                        tokio_sleep(sync_duration).await;
+                        continue;
                     }
-                    tracing::debug!("Sleeping for {:?}...", sync_duration);
-                    tokio_sleep(sync_duration).await;
-                }
+                };
 
-                #[allow(unreachable_code)]
-                Ok::<(), anyhow::Error>(())
-            });
+            // Process batches with each processor
+            let mut processors_results = Vec::new();
 
-            handles.push(handle);
-        }
+            for processor_config in &self.processor_configs {
+                let pool_clone = self.db_pool.clone();
+                let client_clone = self.client.clone();
+                let processor = processor_config.build_processor(pool_clone.clone());
+                let processor_name = processor.name().to_string();
+                let batches_clone = batches.clone();
 
-        // Start all handlers by infinite loop.
-        for handle in handles {
-            match handle.await {
-                Ok(result) => result?,
-                Err(e) => return Err(anyhow::anyhow!("Task panicked: {}", e)),
+                // Create a pipeline for each processor
+                let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
+
+                // Run the pipeline with the fetched batches
+                let result = tokio::spawn(async move {
+                    match pipeline.run(batches_clone).await {
+                        Ok(_) => {
+                            // Update the timestamp for this processor
+                            if let Err(update_err) = update_last_timestamp(
+                                &pool_clone,
+                                &processor_name,
+                                (client_clone.network.clone()).into(),
+                                to_ts.try_into().unwrap(),
+                            )
+                            .await
+                            {
+                                tracing::error!(
+                                    processor_name = processor_name,
+                                    error = ?update_err,
+                                    "Failed to update timestamp"
+                                );
+                                return Err(anyhow::anyhow!(
+                                    "Failed to update timestamp: {}",
+                                    update_err
+                                ));
+                            }
+                            Ok(())
+                        }
+                        Err(err) => {
+                            tracing::error!(
+                                processor_name = processor_name,
+                                error = ?err,
+                                "Pipeline execution failed"
+                            );
+                            Err(anyhow::anyhow!("Pipeline execution failed: {}", err))
+                        }
+                    }
+                });
+
+                processors_results.push(result);
             }
+
+            // Wait for all processors to complete
+            let mut all_successful = true;
+            for result in futures::future::join_all(processors_results).await {
+                match result {
+                    Ok(Ok(_)) => {} // Processor completed successfully
+                    Ok(Err(e)) => {
+                        tracing::error!(error = ?e, "Processor failed");
+                        all_successful = false;
+                    }
+                    Err(e) => {
+                        tracing::error!(error = ?e, "Task panicked");
+                        all_successful = false;
+                    }
+                }
+            }
+
+            // Only advance to next block range if all processors succeeded
+            if all_successful {
+                current_ts = to_ts;
+
+                // Check if we've reached the stop_ts (if specified)
+                if let Some(stop_ts) = self.sync_opts.stop_ts {
+                    if current_ts >= stop_ts {
+                        tracing::info!("Reached stop timestamp {}, exiting", stop_ts);
+                        break;
+                    }
+                }
+            }
+
+            tracing::debug!("Sleeping for {:?}...", sync_duration);
+            tokio_sleep(sync_duration).await;
         }
 
         Ok(())

@@ -29,6 +29,11 @@ pub struct CliArgs {
     /// Path to the config file
     #[arg(short, long, default_value = "config.toml")]
     pub config_path: String,
+
+    /// The network to check the backfill status for
+    /// This will override the network in the config file
+    #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"], required = false)]
+    pub network: String,
 }
 
 #[derive(Args, Clone)]
@@ -51,7 +56,7 @@ pub struct BackfillStatusArgs {
 
 impl From<BackfillStatusArgs> for CliArgs {
     fn from(value: BackfillStatusArgs) -> Self {
-        Self { config_path: value.config_path }
+        Self { config_path: value.config_path, network: value.network }
     }
 }
 
