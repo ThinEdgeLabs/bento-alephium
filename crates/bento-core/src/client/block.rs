@@ -54,7 +54,7 @@ impl BlockProvider for Client {
 
         loop {
             attempt += 1;
-            tracing::info!(
+            tracing::debug!(
                 "Requesting blocks with events from: {} to: {} (attempt {}/{})",
                 from_ts,
                 to_ts,

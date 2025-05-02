@@ -4,6 +4,7 @@ network = "testnet"
 start = 1716560632750
 step = 18000000
 sync_duration = 1000
+request_interval = 1000
 
 [worker.strategy]
 name = "parallel"
@@ -14,8 +15,7 @@ port = "8080"
 
 [backfill]
 name = "backfill-1"
-start = 1716560632750
-end = 1716560632750
+request_interval = 1000
 
 [processors.lending]
 name = "lending"
