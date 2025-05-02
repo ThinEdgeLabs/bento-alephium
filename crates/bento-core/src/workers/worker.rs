@@ -47,7 +47,7 @@ impl Worker {
         self.run_migrations().await;
 
         let mut current_ts = self.sync_opts.start_ts;
-        let step = self.sync_opts.step.unwrap_or(1000);
+        let step = self.sync_opts.step;
         let request_interval = Duration::from_millis(self.sync_opts.request_interval);
 
         loop {
@@ -183,6 +183,6 @@ impl Worker {
 pub struct SyncOptions {
     pub start_ts: u64,
     pub stop_ts: Option<u64>,
-    pub step: Option<u64>,
+    pub step: u64,
     pub request_interval: u64,
 }

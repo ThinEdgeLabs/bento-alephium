@@ -6,10 +6,7 @@ use bento_types::network::Network;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Load .env file
     dotenvy::dotenv().ok();
-
-    // Setup logger
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -23,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(SyncOptions {
             start_ts: 1716560632750,
             stop_ts: None,
-            step: Some(1000),
+            step: 1000,
             request_interval: 1000,
         }),
         None,

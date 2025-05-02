@@ -99,7 +99,7 @@ pub async fn new_realtime_worker_from_config(
         Some(SyncOptions {
             start_ts: current_time,
             stop_ts: None,
-            step: Some(1000),
+            step: config.worker.step,
             request_interval: config.worker.request_interval,
         }),
     )
@@ -117,7 +117,7 @@ pub async fn new_backfill_worker_from_config(
         Some(SyncOptions {
             start_ts: config.backfill.start,
             stop_ts: Some(config.backfill.stop),
-            step: Some(config.worker.step),
+            step: config.worker.step,
             request_interval: config.backfill.request_interval,
         }),
     )
