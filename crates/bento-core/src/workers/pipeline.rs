@@ -50,7 +50,8 @@ impl Pipeline {
                     let range = batch.range;
 
                     tracing::info!(
-                        "Processor processing batch with {} blocks (range: {} to {})",
+                        "{} processor processing batch with {} blocks (range: {} to {})",
+                        processor.processor.name().to_uppercase(),
                         blocks_count,
                         range.from_ts,
                         range.to_ts
