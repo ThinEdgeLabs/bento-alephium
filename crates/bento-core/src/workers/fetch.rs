@@ -94,10 +94,11 @@ pub async fn fetch_chunk<T: BlockProvider + 'static>(
     let elapsed = start.elapsed();
 
     tracing::info!(
-        "Fetched {} blocks from timestamp {} to timestamp {} in {:.2?}",
+        "Fetched {} blocks from timestamp {} to timestamp {} ({} seconds) in {:.2?}",
         blocks.clone().len(),
         range.from_ts,
         range.to_ts,
+        (range.to_ts - range.from_ts) / 1_000,
         elapsed
     );
     Ok(BlockBatch { blocks, range })
@@ -300,7 +301,7 @@ mod tests {
         let err = result.unwrap_err().to_string();
         assert!(
             err.contains("Failed to fetch chunk") && err.contains("Simulated worker failure"),
-            "Expected error message to contain 'Failed to fetch chunk' and 'Simulated worker failure', got: {}", 
+            "Expected error message to contain 'Failed to fetch chunk' and 'Simulated worker failure', got: {}",
             err
         );
     }
