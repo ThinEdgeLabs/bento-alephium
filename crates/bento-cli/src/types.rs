@@ -45,12 +45,11 @@ pub struct BackfillArgs {
     /// The processor name to backfill for
     /// This is a required argument
     #[arg(short, long = "processor")]
-    pub processor_name: String,
+    pub processor_name: Option<String>,
 
     /// The network to backfill for
-    /// This is a required argument
     #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"])]
-    pub network: String,
+    pub network: Option<String>,
 
     /// The start timestamp to check the backfill status for
     /// This is an optional argument
