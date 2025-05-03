@@ -192,12 +192,10 @@ pub async fn run_command(
     match cli.command {
         Commands::Run(run) => match run.mode {
             RunMode::Server(args) => {
-                // First convert args to config
                 let config = config_from_args(&args)?;
 
                 println!("Starting server...");
 
-                // Create server config from config
                 let server_config = new_server_config_from_config(&config).await?;
 
                 println!("Server is ready and running on http://{}", server_config.api_endpoint());
@@ -206,7 +204,6 @@ pub async fn run_command(
                     server_config.api_endpoint()
                 );
 
-                // Start the server
                 start(server_config).await?;
             }
             RunMode::Worker(args) => {
@@ -228,14 +225,12 @@ pub async fn run_command(
                 worker.run().await?;
             }
             RunMode::Backfill(args) => {
-                // First convert args to config
-                let config = args.clone().into();
-
-                // Run backfill worker
-                println!("⚙️  Running backfill worker with config: {}", args.config_path);
                 tracing_subscriber::fmt::init();
 
-                // Create backfill worker from config
+                let config = args.clone().into();
+
+                println!("⚙️  Running backfill worker with config: {}", args.config_path);
+
                 let worker = new_backfill_worker_from_config(&config, &processor_factories).await?;
 
                 println!("🚀 Starting backfill worker...");
@@ -248,10 +243,8 @@ pub async fn run_command(
                     return Err(anyhow::anyhow!("Processor name is required for backfill status"));
                 }
 
-                // First convert args to config
                 let config = config_from_args(&args.clone().into())?;
 
-                // Create worker from config
                 let worker =
                     new_realtime_worker_from_config(&config, &processor_factories, None).await?;
 
