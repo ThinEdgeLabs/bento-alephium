@@ -298,11 +298,12 @@ mod tests {
 
         // Verify error is propagated
         assert!(result.is_err(), "Expected error, got {:?}", result);
-        let err = result.unwrap_err().to_string();
+        let err_string = format!("{:#}", result.unwrap_err());
         assert!(
-            err.contains("Failed to fetch chunk") && err.contains("Simulated worker failure"),
-            "Expected error message to contain 'Failed to fetch chunk' and 'Simulated worker failure', got: {}",
-            err
+            err_string.contains("Failed to fetch chunk")
+                && err_string.contains("Simulated worker failure"),
+            "Expected error message to contain both phrases, got: {}",
+            err_string
         );
     }
 
