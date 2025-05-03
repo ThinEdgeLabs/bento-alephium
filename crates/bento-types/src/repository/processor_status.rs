@@ -17,7 +17,7 @@ pub async fn get_last_timestamp(
 
     // TODO: refactor this key construction to a function
     let mut procesor_key = String::from(processor_name);
-    procesor_key.push_str("_");
+    procesor_key.push('_');
     procesor_key.push_str(&network);
 
     if is_backward {
@@ -60,7 +60,7 @@ pub async fn update_last_timestamp(
 
     // Construct the processor key
     let mut processor_key = String::from(processor_name);
-    processor_key.push_str("_");
+    processor_key.push('_');
     processor_key.push_str(&network);
 
     if is_backward {

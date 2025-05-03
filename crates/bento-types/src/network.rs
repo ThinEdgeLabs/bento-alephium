@@ -53,13 +53,17 @@ impl Network {
     }
 }
 
-impl NetworkType {
-    pub fn to_string(&self) -> String {
-        match self {
-            NetworkType::Devnet => "devnet".to_string(),
-            NetworkType::Testnet => "testnet".to_string(),
-            NetworkType::Mainnet => "mainnet".to_string(),
-        }
+impl std::fmt::Display for NetworkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                NetworkType::Devnet => "devnet",
+                NetworkType::Testnet => "testnet",
+                NetworkType::Mainnet => "mainnet",
+            }
+        )
     }
 }
 
