@@ -20,7 +20,7 @@ pub enum Commands {
 pub enum RunMode {
     Server(CliArgs),
     Worker(CliArgs),
-    Backfill(CliArgs),
+    Backfill(BackfillArgs),
     BackfillStatus(BackfillStatusArgs),
 }
 
@@ -54,12 +54,12 @@ pub struct BackfillArgs {
 
     /// The start timestamp to check the backfill status for
     /// This is an optional argument
-    #[arg(short, long = "start")]
+    #[arg(long = "start")]
     pub start: Option<u64>,
 
     /// The end timestamp to check the backfill status for
     /// This is an optional argument
-    #[arg(short, long = "stop")]
+    #[arg(long = "stop")]
     pub stop: Option<u64>,
 }
 

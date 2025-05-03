@@ -229,7 +229,7 @@ pub async fn run_command(
             }
             RunMode::Backfill(args) => {
                 // First convert args to config
-                let config = config_from_args(&args)?;
+                let config = args.clone().into();
 
                 // Run backfill worker
                 println!("⚙️  Running backfill worker with config: {}", args.config_path);

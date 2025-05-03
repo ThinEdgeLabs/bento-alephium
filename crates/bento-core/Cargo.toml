@@ -53,6 +53,7 @@ utoipa-axum.workspace = true
 utoipa-swagger-ui.workspace = true
 utoipa.workspace = true
 uuid.workspace = true
+mockall.workspace = true
 
 [features]
 libpq = ["diesel/postgres"]
