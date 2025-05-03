@@ -46,29 +46,90 @@ impl Worker {
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
 
-        let mut current_ts = self.sync_opts.start_ts;
+        let is_backward = self.sync_opts.start_ts.is_none();
+
+        // If start_ts is None, we need to get the last timestamp for each processor
+        let mut current_ts = if is_backward {
+            // Get the max last_timestamp from all processors
+            let mut max_ts = 0u64;
+            for processor_config in &self.processor_configs {
+                let processor = processor_config.build_processor(self.db_pool.clone());
+                let processor_name = processor.name().to_string();
+
+                // Get last timestamp for this processor
+                match bento_types::repository::processor_status::get_last_timestamp(
+                    &self.db_pool,
+                    &processor_name,
+                    (self.client.network).clone().into(),
+                    is_backward,
+                )
+                .await
+                {
+                    Ok(ts) => {
+                        if ts > max_ts.try_into().unwrap() {
+                            max_ts = ts.try_into().unwrap();
+                            tracing::info!(
+                                processor = processor_name,
+                                last_timestamp = max_ts,
+                                "Found last timestamp"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        max_ts = chrono::Utc::now().timestamp_millis() as u64;
+                        tracing::error!(
+                            error = ?e,
+                            "Failed to get last timestamp for processor {}",
+                            processor_name
+                        );
+                    }
+                }
+            }
+
+            if max_ts == 0 {
+                return Err(anyhow::anyhow!("No valid starting timestamp found for backward sync"));
+            }
+
+            max_ts
+        } else {
+            self.sync_opts.start_ts.unwrap()
+        };
+
         let step = self.sync_opts.step;
         let request_interval = Duration::from_millis(self.sync_opts.request_interval);
 
         loop {
-            let to_ts = match self.sync_opts.stop_ts {
-                Some(stop_ts) if current_ts + step > stop_ts => stop_ts,
-                _ => current_ts + step,
+            let (from_ts, to_ts) = if is_backward {
+                let from_ts = current_ts.saturating_sub(step);
+                (from_ts, current_ts)
+            } else {
+                let to_ts = match self.sync_opts.stop_ts {
+                    Some(stop_ts) if current_ts + step > stop_ts => stop_ts,
+                    _ => current_ts + step,
+                };
+                (current_ts, to_ts)
             };
 
             let range = BlockRange {
-                from_ts: current_ts.try_into().unwrap(),
+                from_ts: from_ts.try_into().unwrap(),
                 to_ts: to_ts.try_into().unwrap(),
             };
 
-            tracing::info!("Fetching blocks from {} to {}...", current_ts, to_ts);
+            tracing::info!("Fetching blocks from {} to {}...", from_ts, to_ts);
 
             // Fetch blocks once for all processors
             let batches =
                 match fetch_parallel(self.client.clone(), range, self.fetch_strategy.num_workers())
                     .await
                 {
-                    Ok(b) => b,
+                    Ok(b) => {
+                        // check if we've reached the beginning
+                        if is_backward && b.is_empty() {
+                            tracing::info!("No more blocks found, reached the beginning");
+                            break;
+                        }
+                        b
+                    }
                     Err(e) => {
                         tracing::error!(
                             error = ?e,
@@ -79,6 +140,7 @@ impl Worker {
                         continue;
                     }
                 };
+
             // Process batches with each processor
             let mut processors_results = Vec::new();
 
@@ -97,11 +159,14 @@ impl Worker {
                     match pipeline.run(batches_clone).await {
                         Ok(_) => {
                             // Update the timestamp for this processor
+                            let update_ts = if is_backward { from_ts } else { to_ts };
+
                             if let Err(update_err) = update_last_timestamp(
                                 &pool_clone,
                                 &processor_name,
                                 (client_clone.network.clone()).into(),
-                                to_ts.try_into().unwrap(),
+                                update_ts.try_into().unwrap(),
+                                is_backward,
                             )
                             .await
                             {
@@ -147,15 +212,17 @@ impl Worker {
                 }
             }
 
-            // Only advance to next block range if all processors succeeded
             if all_successful {
-                current_ts = to_ts;
+                if is_backward {
+                    current_ts = from_ts;
+                } else {
+                    current_ts = to_ts;
 
-                // Check if we've reached the stop_ts (if specified)
-                if let Some(stop_ts) = self.sync_opts.stop_ts {
-                    if current_ts >= stop_ts {
-                        tracing::info!("Reached stop timestamp {}, exiting", stop_ts);
-                        break;
+                    if let Some(stop_ts) = self.sync_opts.stop_ts {
+                        if current_ts >= stop_ts {
+                            tracing::info!("Reached stop timestamp {}, exiting", stop_ts);
+                            break;
+                        }
                     }
                 }
             }
@@ -184,7 +251,7 @@ impl Worker {
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {
-    pub start_ts: u64,
+    pub start_ts: Option<u64>,
     pub stop_ts: Option<u64>,
     pub step: u64,
     pub request_interval: u64,

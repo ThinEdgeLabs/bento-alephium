@@ -85,7 +85,7 @@ pub async fn new_realtime_worker_from_config(
         processor_factories,
         fetch_strategy,
         Some(SyncOptions {
-            start_ts: current_time,
+            start_ts: Some(current_time),
             stop_ts: None,
             step: config.worker.step,
             request_interval: config.worker.request_interval,
@@ -103,7 +103,7 @@ pub async fn new_backfill_worker_from_config(
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
         Some(SyncOptions {
-            start_ts: config.backfill.start.expect("Start timestamp is required"),
+            start_ts: config.backfill.start,
             stop_ts: config.backfill.stop,
             step: config.worker.step,
             request_interval: config.backfill.request_interval,
@@ -238,7 +238,7 @@ pub async fn run_command(
 
                 // Get backfill status
                 let backfill_height =
-                    get_last_timestamp(&worker.db_pool, &args.processor_name, args.network)
+                    get_last_timestamp(&worker.db_pool, &args.processor_name, args.network, true)
                         .await
                         .context("Failed to get last timestamp")?;
 
