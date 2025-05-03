@@ -115,8 +115,8 @@ pub async fn new_backfill_worker_from_config(
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
         Some(SyncOptions {
-            start_ts: config.backfill.start,
-            stop_ts: Some(config.backfill.stop),
+            start_ts: config.backfill.start.expect("Start timestamp is required"),
+            stop_ts: config.backfill.stop,
             step: config.worker.step,
             request_interval: config.backfill.request_interval,
         }),
@@ -229,7 +229,7 @@ pub async fn run_command(
             }
             RunMode::Backfill(args) => {
                 // First convert args to config
-                let config = config_from_args(&args)?;
+                let config = args.clone().into();
 
                 // Run backfill worker
                 println!("⚙️  Running backfill worker with config: {}", args.config_path);
@@ -305,13 +305,15 @@ mod tests {
             stop = 2000
             step = 100
             sync_duration = 500
+            request_interval = 500
 
             [server]
             port = "8080"
 
             [backfill]
             start = 500
-            end = 1500
+            stop = 1500
+            request_interval = 1000
 
             [processors.custom_processor]
             name = "custom"
@@ -341,8 +343,8 @@ mod tests {
 
         assert_eq!(config.server.port, "8080");
 
-        assert_eq!(config.backfill.start, 500);
-        assert_eq!(config.backfill.stop, 1500);
+        assert_eq!(config.backfill.start, Some(500));
+        assert_eq!(config.backfill.stop, Some(1500));
 
         // Check that the processors were loaded
         assert!(config.processors.is_some());
@@ -367,13 +369,15 @@ mod tests {
             start = 1000
             step = 100
             sync_duration = 500
+            request_interval = 500
 
             [server]
             port = "3000"
 
             [backfill]
             start = 500
-            end = 1500
+            stop = 1500
+            request_interval = 1000
         "#;
 
         // Create the config file
@@ -392,8 +396,8 @@ mod tests {
 
         assert_eq!(config.server.port, "3000");
 
-        assert_eq!(config.backfill.start, 500);
-        assert_eq!(config.backfill.stop, 1500);
+        assert_eq!(config.backfill.start, Some(500));
+        assert_eq!(config.backfill.stop, Some(1500));
     }
 
     #[test]
@@ -413,13 +417,15 @@ mod tests {
             sync_duration = 500
             workers = 4
             chunk_size = 100
+            request_interval = 500
 
             [server]
             port = "8080"
 
             [backfill]
             start = 500
-            end = 1500
+            stop = 1500
+            request_interval = 1000
         "#;
 
         // Create the config file

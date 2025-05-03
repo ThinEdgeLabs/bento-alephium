@@ -51,7 +51,7 @@ impl Worker {
         let request_interval = Duration::from_millis(self.sync_opts.request_interval);
 
         loop {
-            let to_ts = current_ts + step;
+            let to_ts = self.sync_opts.stop_ts.unwrap_or(current_ts + step);
             let range = BlockRange {
                 from_ts: current_ts.try_into().unwrap(),
                 to_ts: to_ts.try_into().unwrap(),

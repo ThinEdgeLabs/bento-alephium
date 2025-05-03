@@ -20,7 +20,7 @@ pub enum Commands {
 pub enum RunMode {
     Server(CliArgs),
     Worker(CliArgs),
-    Backfill(CliArgs),
+    Backfill(BackfillArgs),
     BackfillStatus(BackfillStatusArgs),
 }
 
@@ -37,7 +37,33 @@ pub struct CliArgs {
 }
 
 #[derive(Args, Clone)]
+pub struct BackfillArgs {
+    /// Path to the config file
+    #[arg(short, long, default_value = "config.toml")]
+    pub config_path: String,
 
+    /// The processor name to backfill for
+    /// This is a required argument
+    #[arg(short, long = "processor")]
+    pub processor_name: String,
+
+    /// The network to backfill for
+    /// This is a required argument
+    #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"])]
+    pub network: String,
+
+    /// The start timestamp to check the backfill status for
+    /// This is an optional argument
+    #[arg(long = "start")]
+    pub start: Option<u64>,
+
+    /// The end timestamp to check the backfill status for
+    /// This is an optional argument
+    #[arg(long = "stop")]
+    pub stop: Option<u64>,
+}
+
+#[derive(Args, Clone)]
 pub struct BackfillStatusArgs {
     /// Path to the config file
     #[arg(short, long, default_value = "config.toml")]
@@ -57,6 +83,40 @@ pub struct BackfillStatusArgs {
 impl From<BackfillStatusArgs> for CliArgs {
     fn from(value: BackfillStatusArgs) -> Self {
         Self { config_path: value.config_path, network: Some(value.network) }
+    }
+}
+
+impl From<CliArgs> for Config {
+    fn from(args: CliArgs) -> Self {
+        let config_str =
+            std::fs::read_to_string(args.config_path).expect("Failed to read config file");
+        let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
+
+        // Override the network in the config with the one from args
+        if args.network.is_some() {
+            config.worker.network = args.network.clone().unwrap();
+        }
+
+        config
+    }
+}
+
+impl From<BackfillArgs> for Config {
+    fn from(args: BackfillArgs) -> Self {
+        let config_str =
+            std::fs::read_to_string(args.config_path).expect("Failed to read config file");
+        let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
+
+        if args.start.is_some() {
+            config.backfill.start = args.start;
+        }
+
+        if args.stop.is_some() {
+            config.backfill.stop = args.stop;
+        }
+
+        // Override the network in the config with the one from args
+        config
     }
 }
 
@@ -88,8 +148,8 @@ pub struct ServerConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BackfillConfig {
-    pub start: u64,
-    pub stop: u64,
+    pub start: Option<u64>,
+    pub stop: Option<u64>,
     pub request_interval: u64,
 }
 

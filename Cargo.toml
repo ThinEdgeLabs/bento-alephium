@@ -74,3 +74,4 @@ utoipa = "5.3.1"
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
 uuid = { version = "1.15.1", features = ["v4"] }
+mockall = { version = "0.13.1" }

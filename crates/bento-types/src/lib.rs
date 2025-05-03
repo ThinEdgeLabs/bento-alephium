@@ -263,13 +263,13 @@ impl FetchStrategy {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct BlockRange {
     pub from_ts: i64,
     pub to_ts: i64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockBatch {
     pub blocks: Vec<BlockAndEvents>,
     pub range: BlockRange,
