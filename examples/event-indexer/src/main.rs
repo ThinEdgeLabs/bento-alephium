@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Network::Mainnet,
         None,
         Some(SyncOptions {
-            start_ts: 1716560632750,
+            start_ts: Some(1716560632750),
             stop_ts: None,
             step: 1000,
             request_interval: 1000,

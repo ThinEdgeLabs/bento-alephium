@@ -15,18 +15,6 @@ use bento_server::{start, Config as ServerConfig};
 use constants::{DEFAULT_BLOCK_PROCESSOR, DEFAULT_EVENT_PROCESSOR, DEFAULT_TX_PROCESSOR};
 use std::{collections::HashMap, fs, path::Path};
 
-pub fn config_from_args(args: &CliArgs) -> Result<Config> {
-    let config_path = args.config_path.clone();
-    let config_str = std::fs::read_to_string(config_path)?;
-    let mut config: Config = toml::from_str(&config_str)?;
-
-    // Override the network in the config with the one from args
-    if args.network.is_some() {
-        config.worker.network = args.network.clone().unwrap();
-    }
-    Ok(config)
-}
-
 async fn new_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
@@ -97,7 +85,7 @@ pub async fn new_realtime_worker_from_config(
         processor_factories,
         fetch_strategy,
         Some(SyncOptions {
-            start_ts: current_time,
+            start_ts: Some(current_time),
             stop_ts: None,
             step: config.worker.step,
             request_interval: config.worker.request_interval,
@@ -115,7 +103,7 @@ pub async fn new_backfill_worker_from_config(
         processor_factories,
         Some(FetchStrategy::Parallel { num_workers: 10 }),
         Some(SyncOptions {
-            start_ts: config.backfill.start.expect("Start timestamp is required"),
+            start_ts: config.backfill.start,
             stop_ts: config.backfill.stop,
             step: config.worker.step,
             request_interval: config.backfill.request_interval,
@@ -192,7 +180,7 @@ pub async fn run_command(
     match cli.command {
         Commands::Run(run) => match run.mode {
             RunMode::Server(args) => {
-                let config = config_from_args(&args)?;
+                let config = args.clone().into();
 
                 println!("Starting server...");
 
@@ -209,7 +197,7 @@ pub async fn run_command(
             RunMode::Worker(args) => {
                 tracing_subscriber::fmt::init();
 
-                let config = config_from_args(&args)?;
+                let config = args.clone().into();
 
                 println!("⚙️  Running real-time indexer with config: {}", args.config_path);
 
@@ -243,14 +231,14 @@ pub async fn run_command(
                     return Err(anyhow::anyhow!("Processor name is required for backfill status"));
                 }
 
-                let config = config_from_args(&args.clone().into())?;
+                let config = args.clone().into();
 
                 let worker =
                     new_realtime_worker_from_config(&config, &processor_factories, None).await?;
 
                 // Get backfill status
                 let backfill_height =
-                    get_last_timestamp(&worker.db_pool, &args.processor_name, args.network)
+                    get_last_timestamp(&worker.db_pool, &args.processor_name, args.network, true)
                         .await
                         .context("Failed to get last timestamp")?;
 
@@ -323,8 +311,7 @@ mod tests {
             network: Some("testnet".to_string()),
         };
 
-        // Call the function we're testing
-        let config = config_from_args(&args).expect("Failed to load config from args");
+        let config: Config = args.clone().into();
 
         // Verify the config was loaded correctly
         assert_eq!(config.worker.database_url, "postgres://user:password@localhost:5432/db");
@@ -434,6 +421,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "Failed to parse config file")]
     fn test_error_on_invalid_config_format() {
         // Create a temporary directory for our test config
         let temp_dir = tempdir().expect("Failed to create temp directory");
@@ -455,11 +443,11 @@ mod tests {
         };
 
         // Call the function we're testing - it should fail
-        let result = config_from_args(&args);
-        assert!(result.is_err());
+        let _: Config = args.clone().into();
     }
 
     #[test]
+    #[should_panic(expected = "Failed to read config file")]
     fn test_error_on_missing_config_file() {
         // Create CLI args with a non-existent config path
         let args = CliArgs {
@@ -468,7 +456,6 @@ mod tests {
         };
 
         // Call the function we're testing - it should fail
-        let result = config_from_args(&args);
-        assert!(result.is_err());
+        let _: Config = args.clone().into();
     }
 }

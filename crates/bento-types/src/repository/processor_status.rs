@@ -11,13 +11,18 @@ pub async fn get_last_timestamp(
     db_pool: &Arc<DbPool>,
     processor_name: &str,
     network: String,
+    is_backward: bool,
 ) -> Result<i64> {
     tracing::info!(processor = processor_name, "Getting last timestamp");
 
-    // Construct the processor key
+    // TODO: refactor this key construction to a function
     let mut procesor_key = String::from(processor_name);
-    procesor_key.push_str("_");
+    procesor_key.push('_');
     procesor_key.push_str(&network);
+
+    if is_backward {
+        procesor_key.push_str("_backward");
+    }
 
     let mut conn = db_pool.get().await?;
     let ts = processor_status::table
@@ -44,6 +49,7 @@ pub async fn update_last_timestamp(
     processor_name: &str,
     network: String,
     last_timestamp: i64,
+    is_backward: bool,
 ) -> Result<()> {
     tracing::info!(
         processor = processor_name,
@@ -54,8 +60,12 @@ pub async fn update_last_timestamp(
 
     // Construct the processor key
     let mut processor_key = String::from(processor_name);
-    processor_key.push_str("_");
+    processor_key.push('_');
     processor_key.push_str(&network);
+
+    if is_backward {
+        processor_key.push_str("_backward");
+    }
 
     let mut conn = _db_pool.get().await?;
     insert_into(processor_status::table)

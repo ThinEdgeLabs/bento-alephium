@@ -119,6 +119,19 @@ impl From<BackfillArgs> for Config {
     }
 }
 
+impl From<BackfillStatusArgs> for Config {
+    fn from(args: BackfillStatusArgs) -> Self {
+        let config_str =
+            std::fs::read_to_string(args.config_path).expect("Failed to read config file");
+        let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
+
+        // Override the network in the config with the one from args
+        config.worker.network = args.network;
+
+        config
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub worker: WorkerConfig,
