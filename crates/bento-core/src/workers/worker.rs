@@ -77,10 +77,9 @@ impl Worker {
                     }
                     Err(e) => {
                         max_ts = chrono::Utc::now().timestamp_millis() as u64;
-                        tracing::error!(
-                            error = ?e,
-                            "Failed to get last timestamp for processor {}",
-                            processor_name
+                        tracing::info!(
+                            processor = processor_name,
+                            "No previous timestamp found for processor, this appears to be the first run"
                         );
                     }
                 }
