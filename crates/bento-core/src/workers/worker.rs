@@ -75,7 +75,7 @@ impl Worker {
                             );
                         }
                     }
-                    Err(e) => {
+                    Err(_) => {
                         max_ts = chrono::Utc::now().timestamp_millis() as u64;
                         tracing::info!(
                             processor = processor_name,
@@ -104,7 +104,7 @@ impl Worker {
             } else {
                 let to_ts = match self.sync_opts.stop_ts {
                     Some(stop_ts) if current_ts + step > stop_ts => stop_ts,
-                    _ => current_ts + step,
+                    _ => current_ts + self.sync_opts.request_interval * 2,
                 };
                 (current_ts, to_ts)
             };
@@ -215,7 +215,7 @@ impl Worker {
                 if is_backward {
                     current_ts = from_ts;
                 } else {
-                    current_ts = to_ts;
+                    current_ts = to_ts - self.sync_opts.request_interval; // Adjust to overlap so we don't miss blocks
 
                     if let Some(stop_ts) = self.sync_opts.stop_ts {
                         if current_ts >= stop_ts {

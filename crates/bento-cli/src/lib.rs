@@ -79,7 +79,8 @@ pub async fn new_realtime_worker_from_config(
     processor_factories: &HashMap<String, ProcessorFactory>,
     fetch_strategy: Option<FetchStrategy>,
 ) -> Result<Worker> {
-    let current_time = chrono::Utc::now().timestamp_millis() as u64;
+    let current_time =
+        chrono::Utc::now().timestamp_millis() as u64 - config.worker.request_interval; // Start a bit in the past
     new_worker_from_config(
         config,
         processor_factories,
