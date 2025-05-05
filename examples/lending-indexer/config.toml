@@ -3,7 +3,6 @@ database_url = "postgresql://postgres:123456789@localhost:5432/bento_alephium"
 network = "testnet"
 start = 1716560632750
 step = 18000000
-sync_duration = 1000
 request_interval = 1000
 
 [worker.strategy]

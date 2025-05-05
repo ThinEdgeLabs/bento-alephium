@@ -286,7 +286,6 @@ mod tests {
             start = 1000
             stop = 2000
             step = 100
-            sync_duration = 500
             request_interval = 500
 
             [server]
@@ -349,7 +348,6 @@ mod tests {
             network = "mainnet"
             start = 1000
             step = 100
-            sync_duration = 500
             request_interval = 500
 
             [server]
@@ -395,7 +393,6 @@ mod tests {
             start = 1000
             stop = 2000
             step = 100
-            sync_duration = 500
             workers = 4
             chunk_size = 100
             request_interval = 500

@@ -5,16 +5,19 @@ This framework allows you to create custom processors for indexing and processin
 ## Example: Lending Marketplace Processor
 
 The Lending Marketplace Processor demonstrates how to create a custom processor that tracks lending contract events. It processes two types of events:
+
 1. Loan Actions (Create, Cancel, Pay, Accept, Liquidate)
 2. Loan Details (lending and collateral information)
 
 ### Core Components
 
 1. **Data Models**: Database tables represented as Rust structs using Diesel ORM
+
    - `LoanActionModel`: Tracks loan lifecycle events
    - `LoanDetailModel`: Stores loan terms and conditions
 
 2. **Custom Output Type**: Define how processor output is handled
+
    ```rust
    #[derive(Debug, Clone)]
    pub struct LendingContractOutput {
@@ -115,9 +118,9 @@ impl ProcessorTrait for LendingContractProcessor {
         );
 
         // Return custom output
-        Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput { 
-            loan_actions, 
-            loan_details 
+        Ok(ProcessorOutput::Custom(Arc::new(LendingContractOutput {
+            loan_actions,
+            loan_details
         })))
     }
 
@@ -128,7 +131,7 @@ impl ProcessorTrait for LendingContractProcessor {
                 // Store loan actions
                 if !lending_output.loan_actions.is_empty() {
                     insert_loan_actions_to_db(
-                        self.connection_pool.clone(), 
+                        self.connection_pool.clone(),
                         lending_output.loan_actions.clone()
                     ).await?;
                 }
@@ -136,7 +139,7 @@ impl ProcessorTrait for LendingContractProcessor {
                 // Store loan details
                 if !lending_output.loan_details.is_empty() {
                     insert_loan_details_to_db(
-                        self.connection_pool.clone(), 
+                        self.connection_pool.clone(),
                         lending_output.loan_details.clone()
                     ).await?;
                 }
@@ -154,7 +157,7 @@ The factory function is a crucial part that creates and configures your processo
 ```rust
 // Factory function that creates your processor instance
 fn register_lending_contract(
-    pool: Arc<DbPool>, 
+    pool: Arc<DbPool>,
     args: Option<serde_json::Value>
 ) -> Box<dyn ProcessorTrait> {
     // Extract contract address from args
@@ -172,7 +175,7 @@ fn register_lending_contract(
 }
 
 // Register the processor with the worker
-let processor_config = ProcessorConfig::Custom { 
+let processor_config = ProcessorConfig::Custom {
     name: "lending processor".to_string(),
     factory: register_lending_contract,  // Pass the factory function
     args: Some(serde_json::json!({
@@ -189,14 +192,13 @@ let worker = Worker::new(
     Some(SyncOptions {
         start_ts: Some(1716560632750),
         step: Some(1800000 * 10),
-        back_step: None,
-        sync_duration: None,
     }),
     Some(FetchStrategy::Parallel { num_workers: 10 }),
 ).await?;
 ```
 
 The factory function pattern allows for:
+
 - Dynamic processor creation based on configuration
 - Dependency injection (database pool)
 - Configuration validation at startup
@@ -212,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let processor_config = ProcessorConfig::Custom { 
+    let processor_config = ProcessorConfig::Custom {
         name: "lending processor".to_string(),
         factory: register_lending_contract,
         args: Some(serde_json::json!({
@@ -228,8 +230,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(SyncOptions {
             start_ts: Some(1716560632750),
             step: Some(1800000 * 10), // Process blocks in 5-hour chunks
-            back_step: None,
-            sync_duration: None,
         }),
         Some(FetchStrategy::Parallel { num_workers: 10 }),
     ).await?;
@@ -242,18 +242,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Best Practices
 
 1. **Event Processing**
+
    - Validate event field count before processing
    - Use proper type conversion with error handling
    - Filter events by contract address
    - Handle different event types appropriately
 
 2. **Custom Output Handling**
+
    - Implement `CustomProcessorOutput` trait for your output type
    - Use `ProcessorOutput::Custom` to wrap your output
    - Override `store_output` to handle custom data storage
    - Use proper type downcasting with error handling
 
 3. **Error Handling**
+
    - Use custom error types for specific failures
    - Implement comprehensive logging
    - Handle all potential error cases
