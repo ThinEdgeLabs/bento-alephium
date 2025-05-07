@@ -1,40 +1,52 @@
-# Use the Rust official image
-FROM rust:1.84.0
+FROM rust:1.86-slim-bookworm AS builder
 
-# Set the working directory
 WORKDIR /app
 
-# Install system dependencies for Diesel, PostgreSQL, and debugging tools
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    build-essential \
     libpq-dev \
-    postgresql-client \
-    iputils-ping \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    git \
+    curl \
+    ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy project files
 COPY Cargo.toml Cargo.lock ./
-COPY diesel.toml rustfmt.toml ./
-COPY migrations ./migrations
-COPY src ./src
 
-# Install Diesel CLI for managing migrations
-RUN cargo install diesel_cli --no-default-features --features postgres
+# Create directory structure for workspace
+RUN mkdir -p crates examples
 
-# Install cargo-watch for automatic reloading
-RUN cargo install cargo-watch
+COPY crates/ ./crates/
 
-# Build the Rust project in release mode
-RUN cargo build --release
+COPY examples/linx-indexer ./examples/linx-indexer
 
-# Debug: List the contents of the target directory to ensure the binary is built
-RUN ls -l ./target/release
+# Build binaries to cache dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release && \
+    cp /app/target/release/bento /app/bento
 
-# Expose the application port
-EXPOSE 8080
+# Create final lightweight image
+FROM debian:bookworm-slim
 
-# Copy the entrypoint script
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpq5 \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the entrypoint to use the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+WORKDIR /app
+
+# Copy binaries from workspace target directory
+COPY --from=builder /app/bento /app/
+
+# Copy config
+COPY ./examples/linx-indexer/config.toml /app/config.toml
+
+# Default command will be overridden in docker-compose.yml
+CMD ["./bento"]

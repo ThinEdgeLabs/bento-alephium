@@ -1,6 +1,30 @@
-/target
-.env
-.DS_Store
+# Ignore build artifacts
+target/
+**/target/
 
-.vscode
-.idea
+# Ignore temporary files
+*.rs.bk
+*.swp
+*.swo
+
+# Ignore Git files
+.git
+.gitignore
+
+# Ignore local configs and secrets
+.env
+*.toml.local
+*.toml.backup
+
+# Ignore Dockerfile artifacts
+Dockerfile*
+docker-compose.yml
+docker-compose.override.yml
+
+# Ignore OS-generated files
+.DS_Store
+Thumbs.db
+
+# Ignore editor settings
+.vscode/
+.idea/
