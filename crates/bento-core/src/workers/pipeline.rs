@@ -49,7 +49,7 @@ impl Pipeline {
                     let blocks_count = batch.blocks.len();
                     let range = batch.range;
 
-                    tracing::info!(
+                    tracing::debug!(
                         "{} processor processing batch with {} blocks (range: {} to {})",
                         processor.processor.name().to_uppercase(),
                         blocks_count,
@@ -89,7 +89,7 @@ impl Pipeline {
         process_result??;
         storage_result??;
 
-        tracing::info!("Pipeline execution completed successfully");
+        tracing::debug!("Pipeline execution completed successfully");
         Ok(())
     }
 }

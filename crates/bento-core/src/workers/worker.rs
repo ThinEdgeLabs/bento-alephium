@@ -115,7 +115,9 @@ impl Worker {
                 to_ts: to_ts.try_into().unwrap(),
             };
 
-            tracing::info!("Fetching blocks from {} to {}...", from_ts, to_ts);
+            let from_ts_datetime = chrono::DateTime::from_timestamp_millis(from_ts as i64).unwrap();
+            let to_ts_datetime = chrono::DateTime::from_timestamp_millis(to_ts as i64).unwrap();
+            tracing::info!("Fetching blocks from {} to {}...", from_ts_datetime, to_ts_datetime);
 
             // Fetch blocks once for all processors
             let batches =
@@ -216,8 +218,9 @@ impl Worker {
                 if is_backward {
                     current_ts = from_ts;
                 } else {
-                    current_ts = to_ts - self.sync_opts.request_interval; // Adjust to overlap so we don't miss blocks
-
+                    let now = chrono::Utc::now().timestamp_millis() as u64;
+                    current_ts = now - self.sync_opts.request_interval; // Adjust to overlap so we don't miss blocks
+                                                                        // Convert timestamp (milliseconds) to NaiveDateTime for better human readability
                     if let Some(stop_ts) = self.sync_opts.stop_ts {
                         if current_ts >= stop_ts {
                             tracing::info!("Reached stop timestamp {}, exiting", stop_ts);

@@ -14,7 +14,7 @@ pub async fn fetch_parallel<T: BlockProvider + 'static>(
     let total_time: i64 = range.to_ts - range.from_ts;
     let chunk_size = total_time / num_workers as i64;
 
-    tracing::info!(
+    tracing::debug!(
         "Starting parallel fetch with {} workers for range {}-{}",
         num_workers,
         range.from_ts,
@@ -64,7 +64,7 @@ pub async fn fetch_parallel<T: BlockProvider + 'static>(
         completed_workers += 1;
     }
 
-    tracing::info!("Parallel fetch completed successfully, retrieved {} batches", results.len());
+    tracing::debug!("Parallel fetch completed successfully, retrieved {} batches", results.len());
 
     Ok(results)
 }
@@ -93,7 +93,7 @@ pub async fn fetch_chunk<T: BlockProvider + 'static>(
 
     let elapsed = start.elapsed();
 
-    tracing::info!(
+    tracing::debug!(
         "Fetched {} blocks from timestamp {} to timestamp {} ({} seconds) in {:.2?}",
         blocks.clone().len(),
         range.from_ts,

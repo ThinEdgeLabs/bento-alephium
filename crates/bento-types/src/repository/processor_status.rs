@@ -51,7 +51,7 @@ pub async fn update_last_timestamp(
     last_timestamp: i64,
     is_backward: bool,
 ) -> Result<()> {
-    tracing::info!(
+    tracing::debug!(
         processor = processor_name,
         network = network,
         last_timestamp = last_timestamp,

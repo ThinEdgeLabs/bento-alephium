@@ -73,7 +73,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./config:/app/config
+      - ./examples/linx-indexer/config.toml:/app/config.toml
     networks:
       - bento-network
 
