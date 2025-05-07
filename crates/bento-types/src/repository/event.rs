@@ -33,12 +33,7 @@ pub async fn insert_events_to_db(db: Arc<DbPool>, events: Vec<EventModel>) -> Re
         Duration::from_secs(30), // Increased timeout for larger batches
         insert_into(crate::schema::events::table)
             .values(&events)
-            .on_conflict((
-                crate::schema::events::tx_id,
-                crate::schema::events::contract_address,
-                crate::schema::events::event_index,
-            ))
-            .do_nothing()
+            .on_conflict_do_nothing()
             .execute(&mut conn),
     )
     .await
