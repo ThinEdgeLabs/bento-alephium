@@ -1827,6 +1827,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
 
 [[package]]
+name = "linx-indexer"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bento-cli",
+ "bento-core",
+ "bento-trait",
+ "bento-types",
+ "bigdecimal",
+ "chrono",
+ "clap",
+ "diesel",
+ "diesel-async",
+ "diesel-enum",
+ "dotenv",
+ "dotenvy",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "tokio",
+ "tokio-postgres",
+ "tracing",
+]
+
+[[package]]
 name = "litemap"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

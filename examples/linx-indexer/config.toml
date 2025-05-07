@@ -1,0 +1,18 @@
+[worker]
+database_url = "postgresql://postgres:postgres@db:5432/bento_alephium"
+network = "mainnet"
+start = 1716560632750
+step = 1800000
+request_interval = 1000
+
+[worker.strategy]
+name = "parallel"
+workers = 10
+
+[server]
+port = "8080"
+
+[backfill]
+# start = 1746154519000
+# stop = 1746154665000
+request_interval = 0
