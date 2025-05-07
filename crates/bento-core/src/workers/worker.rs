@@ -106,7 +106,7 @@ impl Worker {
                     .sync_opts
                     .stop_ts
                     .map(|stop_ts| current_ts.saturating_add(step).min(stop_ts))
-                    .unwrap_or_else(|| current_ts + step);
+                    .unwrap_or_else(|| current_ts + self.sync_opts.request_interval * 2);
                 (current_ts, to_ts)
             };
 
