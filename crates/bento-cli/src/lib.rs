@@ -117,7 +117,7 @@ pub async fn new_server_config_from_config(config: &Config) -> Result<ServerConf
     let db_pool = new_db_pool(&config.worker.database_url, None).await?;
     let server_config = ServerConfig {
         db_client: db_pool,
-        api_host: "localhost".into(),
+        api_host: String::from("0.0.0.0"),
         api_port: config.server.port.parse()?,
     };
     Ok(server_config)
