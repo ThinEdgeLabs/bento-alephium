@@ -39,7 +39,8 @@ impl BlockProvider for Client {
         from_ts: i64,
         to_ts: i64,
     ) -> Result<BlocksAndEventsPerTimestampRange> {
-        let endpoint = format!("blockflow/blocks-with-events?fromTs={}&toTs={}", from_ts, to_ts);
+        // Using the rich-blocks endpoint to get complete tx input data
+        let endpoint = format!("blockflow/rich-blocks?fromTs={}&toTs={}", from_ts, to_ts);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
 
         // Configure backoff for deserialization retries

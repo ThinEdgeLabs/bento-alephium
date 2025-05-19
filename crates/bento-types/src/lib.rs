@@ -6,37 +6,34 @@ pub mod processors;
 pub mod repository;
 pub mod schema;
 pub mod utils;
+
 use std::fmt::Debug;
-
-pub use models::*;
-// Database pool type aliases
-pub type DbPool = Pool<AsyncPgConnection>;
-
-// Database pool connection type aliases
-pub type DbPoolConnection<'a> = PooledConnection<'a, AsyncPgConnection>;
 
 use crate::processors::ProcessorOutput;
 use diesel_async::{
     pooled_connection::bb8::{Pool, PooledConnection},
     AsyncPgConnection,
 };
+pub use models::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+pub type DbPool = Pool<AsyncPgConnection>;
+pub type DbPoolConnection<'a> = PooledConnection<'a, AsyncPgConnection>;
+
 pub const DEFAULT_GROUP_NUM: i64 = 4;
 pub const REORG_TIMEOUT: i64 = 210 * 16 * 1000; // 210 blocks * 16 seconds
+pub const MAX_TIMESTAMP_RANGE: i64 = 1800000;
 
 pub type Event = ContractEventByBlockHash;
 pub type BlockHash = String;
 pub type GroupIndex = i64;
 
-/// Trait for custom processor outputs
 pub trait CustomProcessorOutput: Send + Sync + Debug + 'static {
     fn as_any(&self) -> &dyn std::any::Any;
     fn clone_box(&self) -> Box<dyn CustomProcessorOutput>;
 }
 
-/// Represents the header of a block in a blockchain.
-/// Contains information such as the hash, timestamp, chain range, and block height.
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockHeaderEntry {
@@ -132,6 +129,17 @@ pub struct ContractEventByBlockHash {
     pub fields: Vec<EventField>,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Transaction {
+    pub unsigned: UnsignedTx,                // The unsigned transaction.
+    pub script_execution_ok: bool,           // Whether the script execution was successful.
+    pub contract_inputs: Vec<ContractInput>, // The contract inputs associated with the transaction.
+    pub generated_outputs: Vec<Output>,      // The outputs generated from the transaction.
+    pub input_signatures: Vec<String>,       // The signatures of the inputs.
+    pub script_signatures: Vec<String>,      // The script signatures for the transaction.
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnsignedTx {
@@ -141,19 +149,8 @@ pub struct UnsignedTx {
     pub script_opt: Option<String>,           // Optional script for the transaction.
     pub gas_amount: i32,                      // The gas amount used for the transaction.
     pub gas_price: String,                    // The price of gas for the transaction.
-    pub inputs: Vec<AssetInput>,              // The inputs of the transaction.
+    pub inputs: Vec<RichAssetInput>,          // The inputs of the transaction.
     pub fixed_outputs: Vec<FixedAssetOutput>, // The fixed outputs of the transaction.
-}
-
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct Transaction {
-    pub unsigned: UnsignedTx,            // The unsigned transaction.
-    pub script_execution_ok: bool,       // Whether the script execution was successful.
-    pub contract_inputs: Vec<OutputRef>, // The contract inputs associated with the transaction.
-    pub generated_outputs: Vec<Output>,  // The outputs generated from the transaction.
-    pub input_signatures: Vec<String>,   // The signatures of the inputs.
-    pub script_signatures: Vec<String>,  // The script signatures for the transaction.
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -163,9 +160,24 @@ pub struct OutputRef {
     pub key: String, // The key for the output reference.
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OutputType {
+    AssetOutput,
+    ContractOutput,
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Output {}
+pub struct Output {
+    #[serde(rename = "type")]
+    pub output_type: OutputType,
+    pub hint: i32,
+    pub key: String,
+    pub atto_alph_amount: String,
+    pub address: String,
+    pub tokens: Vec<Token>,
+}
 
 /// Represents a contract output in a transaction.
 #[derive(Deserialize, Debug)]
@@ -186,18 +198,26 @@ pub struct AssetInput {
     pub unlock_script: String, // The unlock script for the asset input.
 }
 
-/// Represents an asset output in a transaction.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AssetOutput {
+pub struct RichAssetInput {
     pub hint: i32,
     pub key: String,
+    pub unlock_script: String,
     pub atto_alph_amount: String,
     pub address: String,
     pub tokens: Vec<Token>,
-    pub lock_time: i64,
-    pub message: String,
-    pub typ: String,
+}
+
+#[derive(Deserialize, Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractInput {
+    pub hint: i32,
+    pub key: String,
+    pub unlock_script: String,
+    pub atto_alph_amount: String,
+    pub address: String,
+    pub tokens: Vec<Token>,
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
@@ -242,8 +262,6 @@ pub enum StageMessage {
     Processed(ProcessorOutput),
     Complete,
 }
-
-pub const MAX_TIMESTAMP_RANGE: i64 = 1800000;
 
 // Message types for different stages
 #[derive(Clone)]

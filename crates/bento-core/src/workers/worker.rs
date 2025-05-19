@@ -3,12 +3,11 @@ use crate::{
     config::ProcessorConfig,
     db::{new_db_pool, DbPool},
 };
+use anyhow::Result;
 use bento_types::{
     network::Network, repository::processor_status::update_last_timestamp, BlockRange,
     FetchStrategy,
 };
-
-use anyhow::Result;
 
 use super::{fetch::fetch_parallel, pipeline::Pipeline};
 use std::{sync::Arc, time::Duration};
@@ -236,15 +235,13 @@ impl Worker {
 
         Ok(())
     }
-
     // For the normal processor build we just use standard Diesel with the postgres
     // feature enabled (which uses libpq under the hood, hence why we named the feature
     // this way).
     #[cfg(feature = "libpq")]
     async fn run_migrations(&self) {
-        use diesel::{pg::PgConnection, Connection};
-
         use crate::db::run_pending_migrations;
+        use diesel::{pg::PgConnection, Connection};
 
         tracing::info!("Running migrations: {:?}", self.db_url);
         let mut conn = PgConnection::establish(&self.db_url).expect("migrations failed!");
