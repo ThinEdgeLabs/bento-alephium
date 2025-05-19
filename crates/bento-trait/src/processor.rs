@@ -3,6 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 use anyhow::Result;
 use async_trait::async_trait;
 use bento_types::{processors::ProcessorOutput, BlockAndEvents, DbPool};
+
 /// Base trait for all processors that includes both processing and storage
 #[async_trait]
 pub trait ProcessorTrait: Send + Sync + Debug + 'static {
@@ -55,12 +56,6 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
         }
         Ok(())
     }
-}
-
-/// Trait for custom processor outputs
-pub trait CustomProcessorOutput: Send + Sync + Debug + 'static {
-    fn as_any(&self) -> &dyn std::any::Any;
-    fn clone_box(&self) -> Box<dyn CustomProcessorOutput>;
 }
 
 pub type DynProcessor = Box<dyn ProcessorTrait>;

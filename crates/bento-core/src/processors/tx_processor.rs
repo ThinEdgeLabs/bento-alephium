@@ -49,16 +49,7 @@ impl ProcessorTrait for TxProcessor {
         blocks: Vec<BlockAndEvents>,
     ) -> Result<ProcessorOutput> {
         let models = convert_bwe_to_tx_models(blocks);
-        //
 
-        // if !models.is_empty() {
-        //     tracing::info!(
-        //         processor_name = ?self.name(),
-        //         count = ?models.len(),
-        //         "Found models to insert"
-        //     );
-        //     insert_txs_to_db(self.connection_pool.clone(), models).await?;
-        // }
         Ok(ProcessorOutput::Tx(models))
     }
 }
