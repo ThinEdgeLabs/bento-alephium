@@ -98,10 +98,11 @@ pub async fn new_backfill_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
+    let num_workers = config.worker.workers.unwrap_or(10);
     new_worker_from_config(
         config,
         processor_factories,
-        Some(FetchStrategy::Parallel { num_workers: 10 }),
+        Some(FetchStrategy::Parallel { num_workers: num_workers.try_into().unwrap() }),
         Some(SyncOptions {
             start_ts: config.backfill.start,
             stop_ts: config.backfill.stop,
