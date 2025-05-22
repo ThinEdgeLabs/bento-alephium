@@ -161,7 +161,6 @@ pub struct OutputRef {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub enum OutputType {
     AssetOutput,
     ContractOutput,
@@ -214,7 +213,6 @@ pub struct RichAssetInput {
 pub struct ContractInput {
     pub hint: i32,
     pub key: String,
-    pub unlock_script: String,
     pub atto_alph_amount: String,
     pub address: String,
     pub tokens: Vec<Token>,
