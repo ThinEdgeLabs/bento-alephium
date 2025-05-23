@@ -1,7 +1,10 @@
 use anyhow::{Context, Result};
+use axum::http::StatusCode;
+use axum::response::Response;
 use axum::routing::get;
 use bento_types::{db::new_db_pool, DbPool};
 use handler::{BlockApiModule, EventApiModule, TransactionApiModule};
+use metrics::Metrics;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::{openapi::Info, ToSchema};
@@ -9,6 +12,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 pub mod error;
 pub mod handler;
+pub mod metrics;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -37,6 +41,7 @@ impl Config {
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<DbPool>,
+    pub metrics: Metrics,
 }
 use std::str::FromStr;
 
@@ -93,7 +98,9 @@ pub async fn start(config: Config) -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // create our application state
-    let state = AppState { db: config.clone().db_client };
+    let metrics = Metrics::new();
+    metrics.set_health_status(true);
+    let state = AppState { db: config.clone().db_client, metrics };
 
     // create our application stack
     let (app, mut api) = configure_api().with_state(state).split_for_parts();
@@ -115,6 +122,23 @@ async fn root() -> &'static str {
     "Hello Alephium Indexer API"
 }
 
+/// Metrics endpoint that exposes Prometheus metrics
+async fn metrics_handler(
+    axum::extract::State(state): axum::extract::State<AppState>,
+) -> Result<Response<String>, StatusCode> {
+    match state.metrics.encode_metrics() {
+        Ok(metrics) => {
+            let response = Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", "text/plain; charset=utf-8")
+                .body(metrics)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            Ok(response)
+        }
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
 /// Setup the API routes
 #[allow(clippy::let_and_return)]
 pub fn configure_api() -> OpenApiRouter<AppState> {
@@ -122,6 +146,7 @@ pub fn configure_api() -> OpenApiRouter<AppState> {
         .nest("/blocks", BlockApiModule::register())
         .nest("/events", EventApiModule::register())
         .nest("/transactions", TransactionApiModule::register())
+        .route("/metrics", get(metrics_handler))
         .route("/", get(root));
 
     // Users can extend with their modules:
