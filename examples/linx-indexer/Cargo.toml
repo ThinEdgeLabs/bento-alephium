@@ -14,6 +14,7 @@ bento-types = { path = "../../crates/bento-types" }
 bento-trait = { path = "../../crates/bento-trait" }
 clap.workspace = true
 diesel.workspace = true
+diesel_migrations.workspace = true
 diesel-async.workspace = true
 anyhow.workspace = true
 tokio.workspace = true

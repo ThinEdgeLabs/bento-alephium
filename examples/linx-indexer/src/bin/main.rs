@@ -1,8 +1,12 @@
 use std::collections::HashMap;
 
+use linx_indexer::processors::transfer_processor;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let processor_factories = HashMap::new();
+    let mut processor_factories = HashMap::new();
+    processor_factories.insert("transfers".to_string(), transfer_processor::processor_factory());
+
     //processor_factories.insert("swaps".to_string(), swaps::processor_factory());
     //processor_factories.insert("transfers".to_string(), swaps::processor_factory());
     //processor_factories.insert("lending".to_string(), linx_lending::processor_factory());

@@ -22,7 +22,6 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
     ) -> Result<ProcessorOutput>;
 
     /// Store the processing output
-    /// Default implementation for built-in processors. Custom processors need to override this method.
     async fn store_output(&self, output: ProcessorOutput) -> Result<()>;
 }
 
