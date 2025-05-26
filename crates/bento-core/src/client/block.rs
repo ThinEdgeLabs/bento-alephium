@@ -68,7 +68,6 @@ impl BlockProvider for Client {
 
             match response_result {
                 Ok(response) => {
-                    // Check status code first
                     if !response.status().is_success() {
                         let status = response.status();
 
@@ -84,7 +83,6 @@ impl BlockProvider for Client {
                                 continue;
                             }
                         }
-
                         return Err(anyhow::anyhow!("API returned error status: {}", status));
                     }
 

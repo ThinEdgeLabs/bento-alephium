@@ -1842,6 +1842,7 @@ dependencies = [
  "diesel",
  "diesel-async",
  "diesel-enum",
+ "diesel_migrations",
  "dotenv",
  "dotenvy",
  "serde",

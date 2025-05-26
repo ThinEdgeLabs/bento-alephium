@@ -13,6 +13,14 @@ use super::{fetch::fetch_parallel, pipeline::Pipeline};
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep as tokio_sleep;
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SyncOptions {
+    pub start_ts: Option<u64>,
+    pub stop_ts: Option<u64>,
+    pub step: u64,
+    pub request_interval: u64,
+}
+
 pub struct Worker {
     pub db_pool: Arc<DbPool>,
     pub client: Arc<Client>,
@@ -87,7 +95,6 @@ impl Worker {
             if max_ts == 0 {
                 return Err(anyhow::anyhow!("No valid starting timestamp found for backward sync"));
             }
-
             max_ts
         } else {
             self.sync_opts.start_ts.unwrap()
@@ -247,12 +254,4 @@ impl Worker {
         let mut conn = PgConnection::establish(&self.db_url).expect("migrations failed!");
         run_pending_migrations(&mut conn);
     }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct SyncOptions {
-    pub start_ts: Option<u64>,
-    pub stop_ts: Option<u64>,
-    pub step: u64,
-    pub request_interval: u64,
 }

@@ -23,39 +23,7 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
 
     /// Store the processing output
     /// Default implementation for built-in processors. Custom processors need to override this method.
-    async fn store_output(&self, output: ProcessorOutput) -> Result<()> {
-        match output {
-            ProcessorOutput::Block(blocks) => {
-                if !blocks.is_empty() {
-                    bento_types::repository::insert_blocks_to_db(
-                        self.connection_pool().clone(),
-                        blocks,
-                    )
-                    .await?;
-                }
-            }
-            ProcessorOutput::Event(events) => {
-                if !events.is_empty() {
-                    bento_types::repository::insert_events_to_db(
-                        self.connection_pool().clone(),
-                        events,
-                    )
-                    .await?;
-                }
-            }
-            ProcessorOutput::Tx(txs) => {
-                if !txs.is_empty() {
-                    bento_types::repository::insert_txs_to_db(self.connection_pool().clone(), txs)
-                        .await?;
-                }
-            }
-            ProcessorOutput::Custom(_) => {
-                // Custom processors need to override this method to handle custom output
-                tracing::warn!("Custom processor output with no storage implementation");
-            }
-        }
-        Ok(())
-    }
+    async fn store_output(&self, output: ProcessorOutput) -> Result<()>;
 }
 
 pub type DynProcessor = Box<dyn ProcessorTrait>;

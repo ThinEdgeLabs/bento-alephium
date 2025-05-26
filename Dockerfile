@@ -20,7 +20,6 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p crates examples
 
 COPY crates/ ./crates/
-
 COPY examples/linx-indexer ./examples/linx-indexer
 
 # Build binaries to cache dependencies
