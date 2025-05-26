@@ -11,9 +11,10 @@ use bento_core::{
     config::ProcessorConfig, new_db_pool, worker::SyncOptions, workers::worker::Worker,
     ProcessorFactory,
 };
-use bento_server::{start, Config as ServerConfig};
+use bento_server::{start, AppState, Config as ServerConfig};
 use constants::{DEFAULT_BLOCK_PROCESSOR, DEFAULT_EVENT_PROCESSOR, DEFAULT_TX_PROCESSOR};
 use std::{collections::HashMap, fs, path::Path};
+use utoipa_axum::router::OpenApiRouter;
 
 async fn new_worker_from_config(
     config: &Config,
@@ -157,6 +158,7 @@ pub async fn new_server_config_from_config(config: &Config) -> Result<ServerConf
 /// ```
 pub async fn run_command(
     processor_factories: HashMap<String, ProcessorFactory>,
+    router: Option<OpenApiRouter<AppState>>,
     include_default_processors: bool,
 ) -> Result<()> {
     let mut processor_factories = processor_factories;
@@ -193,7 +195,7 @@ pub async fn run_command(
                     server_config.api_endpoint()
                 );
 
-                start(server_config).await?;
+                start(server_config, router).await?;
             }
             RunMode::Worker(args) => {
                 tracing_subscriber::fmt::init();

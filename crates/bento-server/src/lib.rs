@@ -88,17 +88,14 @@ impl Pagination {
     }
 }
 
-pub async fn start(config: Config) -> Result<()> {
-    // initialize tracing
+pub async fn start(config: Config, custom_router: Option<OpenApiRouter<AppState>>) -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    // create our application state
     let state = AppState { db: config.clone().db_client };
 
-    // create our application stack
-    let (app, mut api) = configure_api().with_state(state).split_for_parts();
+    let (app, mut api) = configure_api(custom_router).with_state(state).split_for_parts();
 
-    api.info = Info::new("Alephium REST API", "v1");
+    api.info = Info::new("REST API", "v1");
     api.info.description = Some("Bento Alephium Indexer REST API".to_string());
     let app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
@@ -117,15 +114,16 @@ async fn root() -> &'static str {
 
 /// Setup the API routes
 #[allow(clippy::let_and_return)]
-pub fn configure_api() -> OpenApiRouter<AppState> {
+pub fn configure_api(custom_router: Option<OpenApiRouter<AppState>>) -> OpenApiRouter<AppState> {
     let router = OpenApiRouter::new()
         .nest("/blocks", BlockApiModule::register())
         .nest("/events", EventApiModule::register())
         .nest("/transactions", TransactionApiModule::register())
         .route("/", get(root));
 
-    // Users can extend with their modules:
-    // router.merge(YourApiModule::register())
-
-    router
+    if let Some(custom_router) = custom_router {
+        router.merge(custom_router)
+    } else {
+        router
+    }
 }
