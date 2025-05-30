@@ -108,12 +108,10 @@ pub async fn start(config: Config, custom_router: Option<OpenApiRouter<AppState>
     Ok(())
 }
 
-// basic handler that responds with a static string
 async fn root() -> &'static str {
     "Hello Alephium Indexer API"
 }
 
-/// Setup the API routes
 #[allow(clippy::let_and_return)]
 pub fn configure_api(custom_router: Option<OpenApiRouter<AppState>>) -> OpenApiRouter<AppState> {
     let router = OpenApiRouter::new()
