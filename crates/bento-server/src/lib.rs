@@ -7,6 +7,7 @@ use std::sync::Arc;
 use utoipa::{openapi::Info, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
+
 pub mod error;
 pub mod handler;
 
