@@ -12,6 +12,7 @@ bento-core = { path = "../../crates/bento-core" }
 bento-cli = { path = "../../crates/bento-cli" }
 bento-types = { path = "../../crates/bento-types" }
 bento-trait = { path = "../../crates/bento-trait" }
+bento-server = { path = "../../crates/bento-server" }
 clap.workspace = true
 diesel.workspace = true
 diesel_migrations.workspace = true
@@ -29,3 +30,7 @@ dotenv.workspace = true
 dotenvy.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
+axum.workspace = true
+utoipa-axum.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true

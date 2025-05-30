@@ -1,1 +1,3 @@
 pub mod account_transactions_repository;
+
+pub use account_transactions_repository::AccountTransactionRepository;
