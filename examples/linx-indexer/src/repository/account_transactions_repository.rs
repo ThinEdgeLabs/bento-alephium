@@ -1,6 +1,5 @@
-use crate::models::{
-    account_transactions::AccountTransaction, new_account_transactions::NewTransferTransactionDto,
-};
+use crate::models::{AccountTransaction, NewTransferTransactionDto};
+use crate::models::{AccountTransactionDetails, TransferDetails, TransferTransactionDto};
 use anyhow::Result;
 use bento_types::DbPool;
 use diesel::prelude::*;
@@ -41,7 +40,7 @@ impl AccountTransactionRepository {
                     let inserted_account_txs: Vec<AccountTransaction> =
                         diesel::insert_into(account_transactions::table)
                             .values(&account_txs)
-                            .on_conflict_do_nothing() // Skip duplicates
+                            .on_conflict_do_nothing()
                             .returning(AccountTransaction::as_returning())
                             .get_results(conn)
                             .await?;
@@ -81,5 +80,71 @@ impl AccountTransactionRepository {
             .await?;
 
         Ok(result)
+    }
+
+    pub async fn get_account_transactions(
+        &self,
+        address: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<AccountTransactionDetails>> {
+        let mut conn = self.db_pool.get().await?;
+
+        use crate::schema::{account_transactions, transfers};
+
+        let account_txs: Vec<AccountTransaction> = account_transactions::table
+            .filter(account_transactions::address.eq(address))
+            .order_by(account_transactions::timestamp.desc())
+            .limit(limit)
+            .offset(offset)
+            .load(&mut conn)
+            .await?;
+
+        if account_txs.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let tx_ids: Vec<i64> = account_txs.iter().map(|tx| tx.id).collect();
+
+        let transfers_map: std::collections::HashMap<i64, TransferDetails> = transfers::table
+            .filter(transfers::account_transaction_id.eq_any(&tx_ids))
+            .load::<(i64, i64, String, String, String, bigdecimal::BigDecimal, String)>(&mut conn)
+            .await?
+            .into_iter()
+            .map(|(id, account_tx_id, token_id, from_addr, to_addr, amount, _tx_id)| {
+                (
+                    account_tx_id,
+                    TransferDetails {
+                        id,
+                        token_id,
+                        from_address: from_addr,
+                        to_address: to_addr,
+                        amount,
+                    },
+                )
+            })
+            .collect();
+
+        // TODO: Query swaps and contract_calls tables
+
+        let mut transaction_details = Vec::new();
+        for account_tx in account_txs {
+            match account_tx.tx_type.as_str() {
+                "transfer" => {
+                    if let Some(transfer) = transfers_map.get(&account_tx.id) {
+                        transaction_details.push(AccountTransactionDetails::Transfer(
+                            TransferTransactionDto {
+                                account_transaction: account_tx,
+                                transfer: transfer.clone(),
+                            },
+                        ));
+                    }
+                }
+                // TODO: Add other transaction types
+                _ => continue,
+            }
+        }
+
+        Ok(transaction_details)
     }
 }
