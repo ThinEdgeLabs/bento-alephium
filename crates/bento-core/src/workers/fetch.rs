@@ -82,7 +82,7 @@ pub async fn fetch_chunk<T: BlockProvider + 'static>(
     }
 
     let start = Instant::now();
-    tracing::info!("Fetching blocks from timestamp {} to timestamp {}", range.from_ts, range.to_ts);
+
     let blocks: Vec<BlockAndEvents> = client
         .get_blocks_and_events(range.from_ts, range.to_ts)
         .await?
@@ -94,7 +94,7 @@ pub async fn fetch_chunk<T: BlockProvider + 'static>(
 
     let elapsed = start.elapsed();
 
-    tracing::debug!(
+    tracing::info!(
         "Fetched {} blocks from timestamp {} to timestamp {} ({} seconds) in {:.2?}",
         blocks.clone().len(),
         range.from_ts,

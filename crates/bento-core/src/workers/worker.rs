@@ -53,49 +53,10 @@ impl Worker {
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
 
-        let is_backward = self.sync_opts.start_ts.is_none();
+        let is_backfill = self.sync_opts.start_ts.is_none();
 
-        // If start_ts is None, we need to get the last timestamp for each processor
-        let mut current_ts = if is_backward {
-            // Get the max last_timestamp from all processors
-            let mut max_ts = 0u64;
-            for processor_config in &self.processor_configs {
-                let processor = processor_config.build_processor(self.db_pool.clone());
-                let processor_name = processor.name().to_string();
-
-                // Get last timestamp for this processor
-                match bento_types::repository::processor_status::get_last_timestamp(
-                    &self.db_pool,
-                    &processor_name,
-                    (self.client.network).clone().into(),
-                    is_backward,
-                )
-                .await
-                {
-                    Ok(ts) => {
-                        if ts > max_ts.try_into().unwrap() {
-                            max_ts = ts.try_into().unwrap();
-                            tracing::info!(
-                                processor = processor_name,
-                                last_timestamp = max_ts,
-                                "Found last timestamp"
-                            );
-                        }
-                    }
-                    Err(_) => {
-                        max_ts = chrono::Utc::now().timestamp_millis() as u64;
-                        tracing::info!(
-                            processor = processor_name,
-                            "No previous timestamp found for processor, this appears to be the first run"
-                        );
-                    }
-                }
-            }
-
-            if max_ts == 0 {
-                return Err(anyhow::anyhow!("No valid starting timestamp found for backward sync"));
-            }
-            max_ts
+        let mut current_ts = if is_backfill {
+            self.get_processors_max_timestamp().await?
         } else {
             self.sync_opts.start_ts.unwrap()
         };
@@ -104,15 +65,11 @@ impl Worker {
         let request_interval = Duration::from_millis(self.sync_opts.request_interval);
 
         loop {
-            let (from_ts, to_ts) = if is_backward {
+            let (from_ts, to_ts) = if is_backfill {
                 let from_ts = current_ts.saturating_sub(step);
                 (from_ts, current_ts)
             } else {
-                let to_ts = self
-                    .sync_opts
-                    .stop_ts
-                    .map(|stop_ts| current_ts.saturating_add(step).min(stop_ts))
-                    .unwrap_or_else(|| current_ts + self.sync_opts.request_interval * 2);
+                let to_ts = current_ts + self.sync_opts.request_interval * 2;
                 (current_ts, to_ts)
             };
 
@@ -125,31 +82,33 @@ impl Worker {
             let to_ts_datetime = chrono::DateTime::from_timestamp_millis(to_ts as i64).unwrap();
             tracing::info!("Fetching blocks from {} to {}...", from_ts_datetime, to_ts_datetime);
 
-            // Fetch blocks once for all processors
             let batches =
                 match fetch_parallel(self.client.clone(), range, self.fetch_strategy.num_workers())
                     .await
                 {
-                    Ok(b) => {
-                        // check if we've reached the beginning
-                        if is_backward && b.is_empty() {
+                    Ok(blocks) => {
+                        if is_backfill && blocks.is_empty() {
                             tracing::info!("No more blocks found, reached the beginning");
                             break;
                         }
-                        b
+                        blocks
                     }
                     Err(e) => {
                         tracing::error!(
                             error = ?e,
-                            "Failed to fetch blocks, retrying in {:?}",
-                            request_interval
+                            "Failed to fetch blocks",
                         );
-                        tokio_sleep(request_interval).await;
+                        if is_backfill {
+                            current_ts = from_ts;
+                        } else {
+                            let now = chrono::Utc::now().timestamp_millis() as u64;
+                            current_ts = now - self.sync_opts.request_interval;
+                        }
                         continue;
                     }
                 };
-
-            // Process batches with each processor
+            let total_blocks: usize = batches.iter().map(|batch| batch.blocks.len()).sum();
+            tracing::info!("Fetched {} blocks across {} batches", total_blocks, batches.len());
             let mut processors_results = Vec::new();
 
             for processor_config in &self.processor_configs {
@@ -158,23 +117,20 @@ impl Worker {
                 let processor = processor_config.build_processor(pool_clone.clone());
                 let processor_name = processor.name().to_string();
                 let batches_clone = batches.clone();
-
-                // Create a pipeline for each processor
                 let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
 
                 // Run the pipeline with the fetched batches
                 let result = tokio::spawn(async move {
                     match pipeline.run(batches_clone).await {
                         Ok(_) => {
-                            // Update the timestamp for this processor
-                            let update_ts = if is_backward { from_ts } else { to_ts };
+                            let update_ts = if is_backfill { from_ts } else { to_ts };
 
                             if let Err(update_err) = update_last_timestamp(
                                 &pool_clone,
                                 &processor_name,
                                 (client_clone.network.clone()).into(),
                                 update_ts.try_into().unwrap(),
-                                is_backward,
+                                is_backfill,
                             )
                             .await
                             {
@@ -221,15 +177,15 @@ impl Worker {
             }
 
             if all_successful {
-                if is_backward {
+                if is_backfill {
                     current_ts = from_ts;
                 } else {
                     let now = chrono::Utc::now().timestamp_millis() as u64;
-                    current_ts = now - self.sync_opts.request_interval; // Adjust to overlap so we don't miss blocks
-                                                                        // Convert timestamp (milliseconds) to NaiveDateTime for better human readability
+                    current_ts = now - self.sync_opts.request_interval;
+
                     if let Some(stop_ts) = self.sync_opts.stop_ts {
                         if current_ts >= stop_ts {
-                            tracing::info!("Reached stop timestamp {}, exiting", stop_ts);
+                            tracing::info!("Reached stop timestamp, exiting");
                             break;
                         }
                     }
@@ -242,6 +198,43 @@ impl Worker {
 
         Ok(())
     }
+
+    async fn get_processors_max_timestamp(&self) -> Result<u64, anyhow::Error> {
+        let mut max_ts = 0u64;
+        for processor_config in &self.processor_configs {
+            let processor = processor_config.build_processor(self.db_pool.clone());
+            let processor_name = processor.name().to_string();
+
+            match bento_types::repository::processor_status::get_last_timestamp(
+                &self.db_pool,
+                &processor_name,
+                (self.client.network).clone().into(),
+                true,
+            )
+            .await
+            {
+                Ok(ts) => {
+                    if ts > max_ts.try_into().unwrap() {
+                        max_ts = ts.try_into().unwrap();
+                        tracing::info!(
+                            processor = processor_name,
+                            last_timestamp = max_ts,
+                            "Found last timestamp"
+                        );
+                    }
+                }
+                Err(_) => {
+                    max_ts = chrono::Utc::now().timestamp_millis() as u64;
+                    tracing::info!(
+                        processor = processor_name,
+                        "No previous timestamp found for processor, this appears to be the first run"
+                    );
+                }
+            }
+        }
+        Ok(max_ts)
+    }
+
     // For the normal processor build we just use standard Diesel with the postgres
     // feature enabled (which uses libpq under the hood, hence why we named the feature
     // this way).

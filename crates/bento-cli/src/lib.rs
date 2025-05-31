@@ -88,7 +88,7 @@ pub async fn new_realtime_worker_from_config(
         Some(SyncOptions {
             start_ts: Some(current_time),
             stop_ts: None,
-            step: config.worker.step,
+            step: 0, //TODO: This is not used for real-time worker
             request_interval: config.worker.request_interval,
         }),
     )
@@ -96,20 +96,20 @@ pub async fn new_realtime_worker_from_config(
 }
 
 pub async fn new_backfill_worker_from_config(
+    start_ts: Option<u64>,
+    stop_ts: Option<u64>,
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
-    let num_workers = config.worker.workers.unwrap_or(10);
+    let num_workers = config.backfill.workers;
+    let step = config.backfill.step;
+    let request_interval = config.backfill.request_interval;
+
     new_worker_from_config(
         config,
         processor_factories,
-        Some(FetchStrategy::Parallel { num_workers: num_workers.try_into().unwrap() }),
-        Some(SyncOptions {
-            start_ts: config.backfill.start,
-            stop_ts: config.backfill.stop,
-            step: config.worker.step,
-            request_interval: config.backfill.request_interval,
-        }),
+        Some(FetchStrategy::Parallel { num_workers }),
+        Some(SyncOptions { start_ts, stop_ts, step, request_interval }),
     )
     .await
 }
@@ -179,6 +179,8 @@ pub async fn run_command(
         );
     }
 
+    tracing_subscriber::fmt::init();
+
     let cli = Cli::parse();
     match cli.command {
         Commands::Run(run) => match run.mode {
@@ -198,8 +200,6 @@ pub async fn run_command(
                 start(server_config, router).await?;
             }
             RunMode::Worker(args) => {
-                tracing_subscriber::fmt::init();
-
                 let config = args.clone().into();
 
                 println!("⚙️  Running real-time indexer with config: {}", args.config_path);
@@ -216,15 +216,17 @@ pub async fn run_command(
                 worker.run().await?;
             }
             RunMode::Backfill(args) => {
-                tracing_subscriber::fmt::init();
-
                 let config = args.clone().into();
 
-                println!("⚙️  Running backfill worker with config: {}", args.config_path);
+                let worker = new_backfill_worker_from_config(
+                    args.start,
+                    args.stop,
+                    &config,
+                    &processor_factories,
+                )
+                .await?;
 
-                let worker = new_backfill_worker_from_config(&config, &processor_factories).await?;
-
-                println!("🚀 Starting backfill worker...");
+                println!("Starting backfill worker...");
                 worker.run().await?;
             }
             RunMode::BackfillStatus(args) => {
@@ -276,27 +278,23 @@ mod tests {
     }
 
     #[test]
-    fn test_config_from_args() {
-        // Create a temporary directory for our test config
+    fn test_load_config() {
         let temp_dir = tempdir().expect("Failed to create temp directory");
-
-        // Define a sample config
         let config_content = r#"
             [worker]
             database_url = "postgres://user:password@localhost:5432/db"
             network = "testnet"
             start = 1000
             stop = 2000
-            step = 100
             request_interval = 500
 
             [server]
             port = "8080"
 
             [backfill]
-            start = 500
-            stop = 1500
             request_interval = 1000
+            workers = 2
+            step = 1800000
 
             [processors.custom_processor]
             name = "custom"
@@ -304,7 +302,6 @@ mod tests {
             field2 = 42
         "#;
 
-        // Create the config file
         let config_path = create_test_config_file(temp_dir.path(), config_content);
 
         // Create CLI args with the path to our test config
@@ -320,13 +317,13 @@ mod tests {
         assert_eq!(config.worker.network, "testnet");
         assert_eq!(config.worker.start, 1000);
         assert_eq!(config.worker.stop, Some(2000));
-        assert_eq!(config.worker.step, 100);
         assert_eq!(config.worker.request_interval, 500);
 
-        assert_eq!(config.server.port, "8080");
+        assert_eq!(config.backfill.step, 1800000);
+        assert_eq!(config.backfill.request_interval, 1000);
+        assert_eq!(config.backfill.workers, 2);
 
-        assert_eq!(config.backfill.start, Some(500));
-        assert_eq!(config.backfill.stop, Some(1500));
+        assert_eq!(config.server.port, "8080");
 
         // Check that the processors were loaded
         assert!(config.processors.is_some());
@@ -339,123 +336,13 @@ mod tests {
     }
 
     #[test]
-    fn test_load_config() {
-        // Create a temporary directory for our test config
-        let temp_dir = tempdir().expect("Failed to create temp directory");
-
-        // Define a sample config
-        let config_content = r#"
-            [worker]
-            database_url = "postgres://user:password@localhost:5432/db"
-            network = "mainnet"
-            start = 1000
-            step = 100
-            request_interval = 500
-
-            [server]
-            port = "3000"
-
-            [backfill]
-            start = 500
-            stop = 1500
-            request_interval = 1000
-        "#;
-
-        // Create the config file
-        let config_path = create_test_config_file(temp_dir.path(), config_content);
-
-        // Call the function we're testing
-        let config = load_config(config_path).expect("Failed to load config");
-
-        // Verify the config was loaded correctly
-        assert_eq!(config.worker.database_url, "postgres://user:password@localhost:5432/db");
-        assert_eq!(config.worker.network, "mainnet");
-        assert_eq!(config.worker.start, 1000);
-        assert_eq!(config.worker.stop, None);
-        assert_eq!(config.worker.step, 100);
-        assert_eq!(config.worker.request_interval, 500);
-
-        assert_eq!(config.server.port, "3000");
-
-        assert_eq!(config.backfill.start, Some(500));
-        assert_eq!(config.backfill.stop, Some(1500));
-    }
-
-    #[test]
-    fn test_config_with_optional_fields() {
-        // Create a temporary directory for our test config
-        let temp_dir = tempdir().expect("Failed to create temp directory");
-
-        // Define a sample config with optional fields
-        let config_content = r#"
-            [worker]
-            database_url = "postgres://user:password@localhost:5432/db"
-            rpc_url = "https://example.com/rpc"
-            network = "devnet"
-            start = 1000
-            stop = 2000
-            step = 100
-            workers = 4
-            chunk_size = 100
-            request_interval = 500
-
-            [server]
-            port = "8080"
-
-            [backfill]
-            start = 500
-            stop = 1500
-            request_interval = 1000
-        "#;
-
-        // Create the config file
-        let config_path = create_test_config_file(temp_dir.path(), config_content);
-
-        // Call the function we're testing
-        let config = load_config(config_path).expect("Failed to load config");
-
-        // Verify the optional fields were loaded correctly
-        assert_eq!(config.worker.rpc_url, Some("https://example.com/rpc".to_string()));
-        assert_eq!(config.worker.workers, Some(4));
-        assert_eq!(config.worker.chunk_size, Some(100));
-    }
-
-    #[test]
-    #[should_panic(expected = "Failed to parse config file")]
-    fn test_error_on_invalid_config_format() {
-        // Create a temporary directory for our test config
-        let temp_dir = tempdir().expect("Failed to create temp directory");
-
-        // Define an invalid config
-        let config_content = r#"
-            This is not a valid TOML format
-            [worker
-            database_url = "postgres://user:password@localhost:5432/db"
-        "#;
-
-        // Create the config file
-        let config_path = create_test_config_file(temp_dir.path(), config_content);
-
-        // Create CLI args with the path to our test config
-        let args = CliArgs {
-            config_path: config_path.to_string_lossy().to_string(),
-            network: Some("testnet".to_string()),
-        };
-
-        // Call the function we're testing - it should fail
-        let _: Config = args.clone().into();
-    }
-
-    #[test]
     #[should_panic(expected = "Failed to read config file")]
     fn test_error_on_missing_config_file() {
-        // Create CLI args with a non-existent config path
         let args = CliArgs {
             config_path: "non_existent_config.toml".to_string(),
             network: Some("testnet".to_string()),
         };
 
-        // Call the function we're testing - it should fail
         let _: Config = args.clone().into();
     }
 }

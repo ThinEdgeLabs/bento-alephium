@@ -30,8 +30,7 @@ pub struct CliArgs {
     #[arg(short, long, default_value = "config.toml")]
     pub config_path: String,
 
-    /// The network to check the backfill status for.
-    /// This will override the network in the config file
+    /// The network to run the command on
     #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"])]
     pub network: Option<String>,
 }
@@ -43,7 +42,6 @@ pub struct BackfillArgs {
     pub config_path: String,
 
     /// The processor name to backfill for
-    /// This is a required argument
     #[arg(short, long = "processor")]
     pub processor_name: Option<String>,
 
@@ -51,13 +49,11 @@ pub struct BackfillArgs {
     #[arg(short, long = "network", value_parser = ["devnet", "testnet", "mainnet"])]
     pub network: Option<String>,
 
-    /// The start timestamp to check the backfill status for
-    /// This is an optional argument
+    /// The timestamp to start the backfill from
     #[arg(long = "start")]
     pub start: Option<u64>,
 
-    /// The end timestamp to check the backfill status for
-    /// This is an optional argument
+    /// The timestamp to stop the backfill at
     #[arg(long = "stop")]
     pub stop: Option<u64>,
 }
@@ -91,7 +87,6 @@ impl From<CliArgs> for Config {
             std::fs::read_to_string(args.config_path).expect("Failed to read config file");
         let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
 
-        // Override the network in the config with the one from args
         if args.network.is_some() {
             config.worker.network = args.network.clone().unwrap();
         }
@@ -106,15 +101,10 @@ impl From<BackfillArgs> for Config {
             std::fs::read_to_string(args.config_path).expect("Failed to read config file");
         let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
 
-        if args.start.is_some() {
-            config.backfill.start = args.start;
+        if args.network.is_some() {
+            config.worker.network = args.network.clone().unwrap();
         }
 
-        if args.stop.is_some() {
-            config.backfill.stop = args.stop;
-        }
-
-        // Override the network in the config with the one from args
         config
     }
 }
@@ -125,7 +115,6 @@ impl From<BackfillStatusArgs> for Config {
             std::fs::read_to_string(args.config_path).expect("Failed to read config file");
         let mut config: Self = toml::from_str(&config_str).expect("Failed to parse config file");
 
-        // Override the network in the config with the one from args
         config.worker.network = args.network;
 
         config
@@ -147,9 +136,7 @@ pub struct WorkerConfig {
     pub network: String,
     pub start: u64,
     pub stop: Option<u64>,
-    pub step: u64,
     pub request_interval: u64,
-    pub workers: Option<u32>,
     pub chunk_size: Option<u32>,
 }
 
@@ -160,9 +147,9 @@ pub struct ServerConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BackfillConfig {
-    pub start: Option<u64>,
-    pub stop: Option<u64>,
+    pub step: u64,
     pub request_interval: u64,
+    pub workers: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
