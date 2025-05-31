@@ -134,10 +134,7 @@ pub struct WorkerConfig {
     pub database_url: String,
     pub rpc_url: Option<String>,
     pub network: String,
-    pub start: u64,
-    pub stop: Option<u64>,
     pub request_interval: u64,
-    pub chunk_size: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

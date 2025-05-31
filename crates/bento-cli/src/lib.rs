@@ -284,8 +284,6 @@ mod tests {
             [worker]
             database_url = "postgres://user:password@localhost:5432/db"
             network = "testnet"
-            start = 1000
-            stop = 2000
             request_interval = 500
 
             [server]
@@ -315,8 +313,6 @@ mod tests {
         // Verify the config was loaded correctly
         assert_eq!(config.worker.database_url, "postgres://user:password@localhost:5432/db");
         assert_eq!(config.worker.network, "testnet");
-        assert_eq!(config.worker.start, 1000);
-        assert_eq!(config.worker.stop, Some(2000));
         assert_eq!(config.worker.request_interval, 500);
 
         assert_eq!(config.backfill.step, 1800000);
