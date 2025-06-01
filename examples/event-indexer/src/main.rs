@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             step: 1000,
             request_interval: 1000,
         }),
-        None,
+        2,
     )
     .await?;
 

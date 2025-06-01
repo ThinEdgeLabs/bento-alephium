@@ -6,7 +6,6 @@ use crate::{
 use anyhow::Result;
 use bento_types::{
     network::Network, repository::processor_status::update_last_timestamp, BlockRange,
-    FetchStrategy,
 };
 
 use super::{fetch::fetch_parallel, pipeline::Pipeline};
@@ -27,7 +26,7 @@ pub struct Worker {
     pub processor_configs: Vec<ProcessorConfig>,
     pub db_url: String,
     pub sync_opts: SyncOptions,
-    pub fetch_strategy: FetchStrategy,
+    pub workers: usize,
 }
 
 impl Worker {
@@ -37,7 +36,7 @@ impl Worker {
         network: Network,
         db_pool_size: Option<u32>,
         sync_opts: Option<SyncOptions>,
-        fetch_strategy: Option<FetchStrategy>,
+        workers: usize,
     ) -> Result<Self> {
         let db_pool = new_db_pool(&db_url, db_pool_size).await?;
         Ok(Self {
@@ -46,12 +45,15 @@ impl Worker {
             db_url,
             sync_opts: sync_opts.unwrap_or_default(),
             client: Arc::new(Client::new(network)),
-            fetch_strategy: fetch_strategy.unwrap_or(FetchStrategy::Simple),
+            workers,
         })
     }
 
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
+
+        //TODO: Backfill does not work properly when the stop timestamp is not set.
+        // It does not go backwards, but forward.
 
         let is_backfill = self.sync_opts.start_ts.is_none();
 
@@ -82,31 +84,28 @@ impl Worker {
             let to_ts_datetime = chrono::DateTime::from_timestamp_millis(to_ts as i64).unwrap();
             tracing::info!("Fetching blocks from {} to {}...", from_ts_datetime, to_ts_datetime);
 
-            let batches =
-                match fetch_parallel(self.client.clone(), range, self.fetch_strategy.num_workers())
-                    .await
-                {
-                    Ok(blocks) => {
-                        if is_backfill && blocks.is_empty() {
-                            tracing::info!("No more blocks found, reached the beginning");
-                            break;
-                        }
-                        blocks
+            let batches = match fetch_parallel(self.client.clone(), range, self.workers).await {
+                Ok(blocks) => {
+                    if is_backfill && blocks.is_empty() {
+                        tracing::info!("No more blocks found, reached the beginning");
+                        break;
                     }
-                    Err(e) => {
-                        tracing::error!(
-                            error = ?e,
-                            "Failed to fetch blocks",
-                        );
-                        if is_backfill {
-                            current_ts = from_ts;
-                        } else {
-                            let now = chrono::Utc::now().timestamp_millis() as u64;
-                            current_ts = now - self.sync_opts.request_interval;
-                        }
-                        continue;
+                    blocks
+                }
+                Err(e) => {
+                    tracing::error!(
+                        error = ?e,
+                        "Failed to fetch blocks",
+                    );
+                    if is_backfill {
+                        current_ts = from_ts;
+                    } else {
+                        let now = chrono::Utc::now().timestamp_millis() as u64;
+                        current_ts = now - self.sync_opts.request_interval;
                     }
-                };
+                    continue;
+                }
+            };
             let total_blocks: usize = batches.iter().map(|batch| batch.blocks.len()).sum();
             tracing::info!("Fetched {} blocks across {} batches", total_blocks, batches.len());
             let mut processors_results = Vec::new();

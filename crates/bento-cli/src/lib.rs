@@ -1,9 +1,7 @@
 pub mod constants;
 pub mod types;
 use crate::types::*;
-use bento_types::{
-    network::Network, repository::processor_status::get_last_timestamp, FetchStrategy,
-};
+use bento_types::{network::Network, repository::processor_status::get_last_timestamp};
 use clap::Parser;
 
 use anyhow::{Context, Result};
@@ -19,7 +17,7 @@ use utoipa_axum::router::OpenApiRouter;
 async fn new_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
-    fetch_strategy: Option<FetchStrategy>,
+    workers: usize,
     sync_options: Option<SyncOptions>,
 ) -> Result<Worker> {
     // Get the worker configuration
@@ -69,7 +67,7 @@ async fn new_worker_from_config(
         network,
         None, // Custom DB Schema
         sync_options,
-        fetch_strategy,
+        workers,
     )
     .await?;
     Ok(worker)
@@ -78,13 +76,13 @@ async fn new_worker_from_config(
 pub async fn new_realtime_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
-    fetch_strategy: Option<FetchStrategy>,
 ) -> Result<Worker> {
     let current_time = chrono::Utc::now().timestamp_millis() as u64; // Start a bit in the past
+    let workers: usize = 2;
     new_worker_from_config(
         config,
         processor_factories,
-        fetch_strategy,
+        workers,
         Some(SyncOptions {
             start_ts: Some(current_time),
             stop_ts: None,
@@ -101,14 +99,14 @@ pub async fn new_backfill_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
-    let num_workers = config.backfill.workers;
+    let workers = config.backfill.workers;
     let step = config.backfill.step;
     let request_interval = config.backfill.request_interval;
 
     new_worker_from_config(
         config,
         processor_factories,
-        Some(FetchStrategy::Parallel { num_workers }),
+        workers,
         Some(SyncOptions { start_ts, stop_ts, step, request_interval }),
     )
     .await
@@ -204,12 +202,7 @@ pub async fn run_command(
 
                 println!("⚙️  Running real-time indexer with config: {}", args.config_path);
 
-                let worker = new_realtime_worker_from_config(
-                    &config,
-                    &processor_factories,
-                    Some(FetchStrategy::Simple),
-                )
-                .await?;
+                let worker = new_realtime_worker_from_config(&config, &processor_factories).await?;
 
                 println!("🚀 Starting real-time indexer");
 
@@ -238,8 +231,7 @@ pub async fn run_command(
 
                 let config = args.clone().into();
 
-                let worker =
-                    new_realtime_worker_from_config(&config, &processor_factories, None).await?;
+                let worker = new_realtime_worker_from_config(&config, &processor_factories).await?;
 
                 // Get backfill status
                 let backfill_height =

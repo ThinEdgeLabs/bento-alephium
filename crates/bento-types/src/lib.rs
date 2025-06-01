@@ -261,24 +261,6 @@ pub enum StageMessage {
     Complete,
 }
 
-// Message types for different stages
-#[derive(Clone)]
-pub enum FetchStrategy {
-    Simple,
-    Chunked { chunk_size: i64 },
-    Parallel { num_workers: usize },
-}
-
-impl FetchStrategy {
-    pub fn num_workers(&self) -> usize {
-        match self {
-            FetchStrategy::Simple => 1,
-            FetchStrategy::Chunked { chunk_size: _ } => 1,
-            FetchStrategy::Parallel { num_workers } => *num_workers,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct BlockRange {
     pub from_ts: i64,
