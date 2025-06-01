@@ -145,6 +145,7 @@ pub struct ServerConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BackfillConfig {
     pub step: u64,
+    pub backstep: u64,
     pub request_interval: u64,
     pub workers: usize,
 }

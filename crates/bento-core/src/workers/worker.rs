@@ -14,10 +14,18 @@ use tokio::time::sleep as tokio_sleep;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SyncOptions {
+    pub step: u64,
+    pub backstep: u64,
+    pub request_interval: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct BackfillOptions {
     pub start_ts: Option<u64>,
     pub stop_ts: Option<u64>,
-    pub step: u64,
     pub request_interval: u64,
+    pub step: u64,
+    pub backstep: u64,
 }
 
 pub struct Worker {
@@ -25,7 +33,8 @@ pub struct Worker {
     pub client: Arc<Client>,
     pub processor_configs: Vec<ProcessorConfig>,
     pub db_url: String,
-    pub sync_opts: SyncOptions,
+    pub sync_opts: Option<SyncOptions>,
+    pub backfill_opts: Option<BackfillOptions>,
     pub workers: usize,
 }
 
@@ -36,6 +45,7 @@ impl Worker {
         network: Network,
         db_pool_size: Option<u32>,
         sync_opts: Option<SyncOptions>,
+        backfill_opts: Option<BackfillOptions>,
         workers: usize,
     ) -> Result<Self> {
         let db_pool = new_db_pool(&db_url, db_pool_size).await?;
@@ -43,7 +53,8 @@ impl Worker {
             db_pool: db_pool.clone(),
             processor_configs,
             db_url,
-            sync_opts: sync_opts.unwrap_or_default(),
+            sync_opts,
+            backfill_opts,
             client: Arc::new(Client::new(network)),
             workers,
         })
@@ -52,26 +63,36 @@ impl Worker {
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
 
-        //TODO: Backfill does not work properly when the stop timestamp is not set.
-        // It does not go backwards, but forward.
+        let is_backfill = self.backfill_opts.is_some();
 
-        let is_backfill = self.sync_opts.start_ts.is_none();
+        //TODO: Fix the backfill logic so it correctly handles the start_ts and stop_ts
+        //TODO: Fix the sync logic so it correctly handles the request_interval, step and backstep
+        //TODO: Use most recent block timestamp from the database to determine the current timestamp
+        //TODO: Get the timestamp of the last block from the node to determine the range end timestamp
 
         let mut current_ts = if is_backfill {
             self.get_processors_max_timestamp().await?
         } else {
-            self.sync_opts.start_ts.unwrap()
+            let now = chrono::Utc::now().timestamp_millis() as u64;
+            now
         };
 
-        let step = self.sync_opts.step;
-        let request_interval = Duration::from_millis(self.sync_opts.request_interval);
+        let step;
+        let request_interval;
+        if is_backfill {
+            step = self.backfill_opts.unwrap().step;
+            request_interval = self.backfill_opts.unwrap().request_interval;
+        } else {
+            step = self.sync_opts.unwrap().step;
+            request_interval = self.sync_opts.unwrap().request_interval;
+        }
 
         loop {
             let (from_ts, to_ts) = if is_backfill {
                 let from_ts = current_ts.saturating_sub(step);
                 (from_ts, current_ts)
             } else {
-                let to_ts = current_ts + self.sync_opts.request_interval * 2;
+                let to_ts = current_ts + request_interval * 2;
                 (current_ts, to_ts)
             };
 
@@ -101,7 +122,7 @@ impl Worker {
                         current_ts = from_ts;
                     } else {
                         let now = chrono::Utc::now().timestamp_millis() as u64;
-                        current_ts = now - self.sync_opts.request_interval;
+                        current_ts = now - request_interval;
                     }
                     continue;
                 }
@@ -180,19 +201,19 @@ impl Worker {
                     current_ts = from_ts;
                 } else {
                     let now = chrono::Utc::now().timestamp_millis() as u64;
-                    current_ts = now - self.sync_opts.request_interval;
+                    current_ts = now - request_interval;
 
-                    if let Some(stop_ts) = self.sync_opts.stop_ts {
-                        if current_ts >= stop_ts {
-                            tracing::info!("Reached stop timestamp, exiting");
-                            break;
-                        }
-                    }
+                    // if let Some(stop_ts) = self.sync_opts.stop_ts {
+                    //     if current_ts >= stop_ts {
+                    //         tracing::info!("Reached stop timestamp, exiting");
+                    //         break;
+                    //     }
+                    // }
                 }
             }
 
             tracing::debug!("Sleeping for {:?}...", request_interval);
-            tokio_sleep(request_interval).await;
+            tokio_sleep(Duration::from_millis(request_interval)).await;
         }
 
         Ok(())

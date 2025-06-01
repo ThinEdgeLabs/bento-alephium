@@ -6,7 +6,10 @@ use clap::Parser;
 
 use anyhow::{Context, Result};
 use bento_core::{
-    config::ProcessorConfig, new_db_pool, worker::SyncOptions, workers::worker::Worker,
+    config::ProcessorConfig,
+    new_db_pool,
+    worker::{BackfillOptions, SyncOptions},
+    workers::worker::Worker,
     ProcessorFactory,
 };
 use bento_server::{start, AppState, Config as ServerConfig};
@@ -19,8 +22,8 @@ async fn new_worker_from_config(
     processor_factories: &HashMap<String, ProcessorFactory>,
     workers: usize,
     sync_options: Option<SyncOptions>,
+    backfill_options: Option<BackfillOptions>,
 ) -> Result<Worker> {
-    // Get the worker configuration
     let worker_config = &config.worker;
 
     // Create processor configurations
@@ -53,20 +56,18 @@ async fn new_worker_from_config(
 
     let network: Network;
     if let Some(rpc_url) = &worker_config.rpc_url {
-        // Add the RPC URL to the network configuration
         network = Network::Custom(rpc_url.to_string(), worker_config.network.clone().into());
     } else {
-        // Use the default network configuration
         network = worker_config.network.clone().into();
     }
 
-    // Create and return the worker
     let worker = Worker::new(
         processors,
         worker_config.database_url.clone(),
         network,
-        None, // Custom DB Schema
+        None,
         sync_options,
+        backfill_options,
         workers,
     )
     .await?;
@@ -77,18 +78,17 @@ pub async fn new_realtime_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
-    let current_time = chrono::Utc::now().timestamp_millis() as u64; // Start a bit in the past
     let workers: usize = 2;
     new_worker_from_config(
         config,
         processor_factories,
         workers,
         Some(SyncOptions {
-            start_ts: Some(current_time),
-            stop_ts: None,
-            step: 0, //TODO: This is not used for real-time worker
+            step: 0,
+            backstep: 0,
             request_interval: config.worker.request_interval,
         }),
+        None,
     )
     .await
 }
@@ -101,13 +101,15 @@ pub async fn new_backfill_worker_from_config(
 ) -> Result<Worker> {
     let workers = config.backfill.workers;
     let step = config.backfill.step;
+    let backstep = config.backfill.backstep;
     let request_interval = config.backfill.request_interval;
 
     new_worker_from_config(
         config,
         processor_factories,
         workers,
-        Some(SyncOptions { start_ts, stop_ts, step, request_interval }),
+        None,
+        Some(BackfillOptions { start_ts, stop_ts, step, backstep, request_interval }),
     )
     .await
 }
