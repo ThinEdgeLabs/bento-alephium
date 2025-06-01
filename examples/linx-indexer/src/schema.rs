@@ -1,6 +1,19 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    account_transactions (id) {
+        id -> Int8,
+        address -> Text,
+        tx_type -> Text,
+        from_group -> Int2,
+        to_group -> Int2,
+        block_height -> Int8,
+        tx_id -> Text,
+        timestamp -> Timestamp,
+    }
+}
+
+diesel::table! {
     blocks (hash) {
         hash -> Text,
         timestamp -> Timestamp,
@@ -80,19 +93,20 @@ diesel::table! {
 
 diesel::table! {
     transfers (id) {
-        id -> Int4,
+        id -> Int8,
+        account_transaction_id -> Int8,
         token_id -> Text,
         from_address -> Text,
         to_address -> Text,
-        from_group -> Int2,
-        to_group -> Int2,
         amount -> Numeric,
-        timestamp -> Timestamp,
         tx_id -> Text,
     }
 }
 
+diesel::joinable!(transfers -> account_transactions (account_transaction_id));
+
 diesel::allow_tables_to_appear_in_same_query!(
+    account_transactions,
     blocks,
     events,
     loan_actions,
