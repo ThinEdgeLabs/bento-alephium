@@ -3,8 +3,8 @@ use std::time::Duration;
 use backoff::{backoff::Backoff, ExponentialBackoff as BackoffExp};
 use bento_trait::stage::BlockProvider;
 use bento_types::{
-    BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
-    BlocksPerTimestampRange,
+    BlockAndEvents, BlockEntry, BlockHashesResponse, BlockHeaderEntry,
+    BlocksAndEventsPerTimestampRange, BlocksPerTimestampRange,
 };
 
 use anyhow::Result;
@@ -36,8 +36,8 @@ impl BlockProvider for Client {
     /// TODO: Fix hardcoded parameters in retry
     async fn get_blocks_and_events(
         &self,
-        from_ts: i64,
-        to_ts: i64,
+        from_ts: u64,
+        to_ts: u64,
     ) -> Result<BlocksAndEventsPerTimestampRange> {
         // Using the rich-blocks endpoint to get complete tx input data
         let endpoint = format!("blockflow/rich-blocks?fromTs={}&toTs={}", from_ts, to_ts);
@@ -154,5 +154,20 @@ impl BlockProvider for Client {
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
         let response = self.inner.get(url).send().await?.json().await?;
         Ok(response)
+    }
+
+    async fn get_block_hash_by_height(
+        &self,
+        height: u64,
+        from_group: u32,
+        to_group: u32,
+    ) -> Result<Vec<String>> {
+        let endpoint = format!(
+            "blockflow/hashes?height={}&fromGroup={}&toGroup={}",
+            height, from_group, to_group
+        );
+        let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
+        let response: BlockHashesResponse = self.inner.get(url).send().await?.json().await?;
+        Ok(response.headers)
     }
 }
