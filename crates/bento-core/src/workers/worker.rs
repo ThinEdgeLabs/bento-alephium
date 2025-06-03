@@ -230,48 +230,36 @@ impl Worker {
     }
 
     async fn run_pipeline(&self, batches: Vec<BlockBatch>) -> Result<()> {
-        let mut processors_results = Vec::new();
-        for processor_config in &self.processor_configs {
-            let pool_clone = self.db_pool.clone();
-            let client_clone = self.client.clone();
-            let processor = processor_config.build_processor(pool_clone.clone());
-            let processor_name = processor.name().to_string();
-            let batches_clone = batches.clone();
-            let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
+        let tasks: Vec<_> = self
+            .processor_configs
+            .iter()
+            .map(|processor_config| {
+                let pool_clone = self.db_pool.clone();
+                let client_clone = self.client.clone();
+                let processor = processor_config.build_processor(pool_clone.clone());
+                let processor_name = processor.name().to_string();
+                let batches_clone = batches.clone();
+                let pipeline = Pipeline::new(client_clone, pool_clone, processor);
 
-            //TODO: Refactor this
-            let result = tokio::spawn(async move {
-                match pipeline.run(batches_clone).await {
-                    Ok(_) => {
-                        tracing::debug!(
-                            processor_name = processor_name,
-                            "Processor executed successfully"
-                        );
-                        Ok(())
-                    }
-                    Err(err) => {
+                async move {
+                    pipeline.run(batches_clone).await.map_err(|err| {
                         tracing::error!(
                             processor_name = processor_name,
                             error = ?err,
                             "Processor execution failed"
                         );
-                        Err(anyhow::anyhow!("Processor execution failed: {}", err))
-                    }
+                        anyhow::anyhow!("Processor {} failed: {}", processor_name, err)
+                    })
                 }
-            });
-            processors_results.push(result);
-        }
+            })
+            .collect();
 
-        for result in futures::future::join_all(processors_results).await {
-            match result {
-                Ok(Ok(_)) => {} // Processor completed successfully
-                Ok(Err(e)) => {
-                    tracing::error!(error = ?e, "Processor failed");
-                }
-                Err(e) => {
-                    tracing::error!(error = ?e, "Task panicked");
-                }
-            }
+        // Run all processors concurrently
+        let results = futures::future::join_all(tasks).await;
+
+        // Check if any failed
+        for result in results {
+            result?;
         }
 
         Ok(())
