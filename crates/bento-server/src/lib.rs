@@ -90,8 +90,6 @@ impl Pagination {
 }
 
 pub async fn start(config: Config, custom_router: Option<OpenApiRouter<AppState>>) -> Result<()> {
-    tracing_subscriber::fmt::init();
-
     let state = AppState { db: config.clone().db_client };
 
     let (app, mut api) = configure_api(custom_router).with_state(state).split_for_parts();
