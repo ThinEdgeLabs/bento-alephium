@@ -137,10 +137,7 @@ impl Worker {
                 - backstep;
 
             let now = chrono::Utc::now().timestamp_millis() as u64;
-            println!(
-                "Current timestamp: {}, Now: {}, Step: {}, Backstep: {}",
-                current_ts, now, step, backstep
-            );
+
             // Process in chunks of 'step' size until we reach 'now'
             while current_ts < now {
                 let chunk_end = std::cmp::min(current_ts + step, now);
@@ -170,8 +167,17 @@ impl Worker {
 
         tracing::info!("Syncing blocks in range: {:?}", range);
 
-        //TODO: Handle failure gracefully instead of panicking
-        let batches = fetch_parallel(self.client.clone(), range, self.workers).await?;
+        let batches = match fetch_parallel(self.client.clone(), range, self.workers).await {
+            Ok(batches) => batches,
+            Err(err) => {
+                tracing::error!(
+                    range = ?range,
+                    error = ?err,
+                    "Failed to fetch blocks, skipping range"
+                );
+                return Ok(()); // Continue processing other ranges
+            }
+        };
 
         if batches.is_empty() {
             tracing::warn!("No blocks found in the specified range");
