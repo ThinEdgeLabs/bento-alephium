@@ -4,8 +4,11 @@ use crate::{
     db::{new_db_pool, DbPool},
 };
 use anyhow::Result;
+use bento_trait::stage::BlockProvider;
 use bento_types::{
-    network::Network, repository::processor_status::update_last_timestamp, BlockRange,
+    network::Network,
+    repository::{get_blocks_at_height, get_max_block_timestamp},
+    BlockBatch, BlockRange, DEFAULT_GROUP_NUM,
 };
 
 use super::{fetch::fetch_parallel, pipeline::Pipeline};
@@ -63,196 +66,215 @@ impl Worker {
     pub async fn run(&self) -> Result<()> {
         self.run_migrations().await;
 
-        let is_backfill = self.backfill_opts.is_some();
+        match self.backfill_opts {
+            Some(opts) => {
+                tracing::info!("Starting backfill with options: {:?}", opts);
+                self.run_backfill(opts).await?;
+            }
+            None => {
+                tracing::info!("Starting sync with options: {:?}", self.sync_opts);
+                self.run_sync().await?;
+            }
+        }
+        Ok(())
+    }
 
-        //TODO: Fix the backfill logic so it correctly handles the start_ts and stop_ts
-        //TODO: Fix the sync logic so it correctly handles the request_interval, step and backstep
-        //TODO: Use most recent block timestamp from the database to determine the current timestamp
-        //TODO: Get the timestamp of the last block from the node to determine the range end timestamp
-
-        let mut current_ts = if is_backfill {
-            self.get_processors_max_timestamp().await?
-        } else {
-            let now = chrono::Utc::now().timestamp_millis() as u64;
-            now
+    pub async fn run_backfill(&self, backfill_opts: BackfillOptions) -> Result<()> {
+        println!("Running backfill with options: {:?}", backfill_opts);
+        let start_ts = match backfill_opts.start_ts {
+            Some(ts) => ts,
+            None => {
+                // Make sure we have the genesis and one more block synced
+                self.sync_at_height(0).await?;
+                self.sync_at_height(1).await?;
+                // Take the min timestamp of the blocks at height 1
+                let blocks = get_blocks_at_height(&self.db_pool, 1).await?;
+                blocks.iter().map(|b| b.timestamp).min().unwrap().and_utc().timestamp_millis()
+                    as u64
+            }
         };
 
-        let step;
-        let request_interval;
-        if is_backfill {
-            step = self.backfill_opts.unwrap().step;
-            request_interval = self.backfill_opts.unwrap().request_interval;
-        } else {
-            step = self.sync_opts.unwrap().step;
-            request_interval = self.sync_opts.unwrap().request_interval;
-        }
-
-        loop {
-            let (from_ts, to_ts) = if is_backfill {
-                let from_ts = current_ts.saturating_sub(step);
-                (from_ts, current_ts)
-            } else {
-                let to_ts = current_ts + request_interval * 2;
-                (current_ts, to_ts)
-            };
-
-            let range = BlockRange {
-                from_ts: from_ts.try_into().unwrap(),
-                to_ts: to_ts.try_into().unwrap(),
-            };
-
-            let from_ts_datetime = chrono::DateTime::from_timestamp_millis(from_ts as i64).unwrap();
-            let to_ts_datetime = chrono::DateTime::from_timestamp_millis(to_ts as i64).unwrap();
-            tracing::info!("Fetching blocks from {} to {}...", from_ts_datetime, to_ts_datetime);
-
-            let batches = match fetch_parallel(self.client.clone(), range, self.workers).await {
-                Ok(blocks) => {
-                    if is_backfill && blocks.is_empty() {
-                        tracing::info!("No more blocks found, reached the beginning");
-                        break;
-                    }
-                    blocks
-                }
-                Err(e) => {
-                    tracing::error!(
-                        error = ?e,
-                        "Failed to fetch blocks",
-                    );
-                    if is_backfill {
-                        current_ts = from_ts;
-                    } else {
-                        let now = chrono::Utc::now().timestamp_millis() as u64;
-                        current_ts = now - request_interval;
-                    }
-                    continue;
-                }
-            };
-            let total_blocks: usize = batches.iter().map(|batch| batch.blocks.len()).sum();
-            tracing::info!("Fetched {} blocks across {} batches", total_blocks, batches.len());
-            let mut processors_results = Vec::new();
-
-            for processor_config in &self.processor_configs {
-                let pool_clone = self.db_pool.clone();
-                let client_clone = self.client.clone();
-                let processor = processor_config.build_processor(pool_clone.clone());
-                let processor_name = processor.name().to_string();
-                let batches_clone = batches.clone();
-                let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
-
-                // Run the pipeline with the fetched batches
-                let result = tokio::spawn(async move {
-                    match pipeline.run(batches_clone).await {
-                        Ok(_) => {
-                            let update_ts = if is_backfill { from_ts } else { to_ts };
-
-                            if let Err(update_err) = update_last_timestamp(
-                                &pool_clone,
-                                &processor_name,
-                                (client_clone.network.clone()).into(),
-                                update_ts.try_into().unwrap(),
-                                is_backfill,
-                            )
-                            .await
-                            {
-                                tracing::error!(
-                                    processor_name = processor_name,
-                                    error = ?update_err,
-                                    "Failed to update timestamp"
-                                );
-                                return Err(anyhow::anyhow!(
-                                    "Failed to update timestamp: {}",
-                                    update_err
-                                ));
-                            }
-                            Ok(())
-                        }
-                        Err(err) => {
-                            tracing::error!(
-                                processor_name = processor_name,
-                                error = ?err,
-                                "Pipeline execution failed"
-                            );
-                            Err(anyhow::anyhow!("Pipeline execution failed: {}", err))
-                        }
-                    }
-                });
-
-                processors_results.push(result);
+        let stop_ts = match backfill_opts.stop_ts {
+            Some(ts) => ts,
+            None => {
+                get_max_block_timestamp(&self.db_pool)
+                    .await?
+                    .unwrap_or_else(|| chrono::Utc::now().timestamp_millis()) as u64
+                //TODO: If the database is empty, get the most recent block timestamp from the node
             }
+        };
 
-            // Wait for all processors to complete
-            let mut all_successful = true;
-            for result in futures::future::join_all(processors_results).await {
-                match result {
-                    Ok(Ok(_)) => {} // Processor completed successfully
-                    Ok(Err(e)) => {
-                        tracing::error!(error = ?e, "Processor failed");
-                        all_successful = false;
-                    }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Task panicked");
-                        all_successful = false;
-                    }
-                }
-            }
+        let mut current_ts = start_ts;
+        while current_ts < stop_ts {
+            let chunk_end = std::cmp::min(current_ts + backfill_opts.step, stop_ts);
 
-            if all_successful {
-                if is_backfill {
-                    current_ts = from_ts;
-                } else {
-                    let now = chrono::Utc::now().timestamp_millis() as u64;
-                    current_ts = now - request_interval;
+            self.sync_range(current_ts, chunk_end).await?;
 
-                    // if let Some(stop_ts) = self.sync_opts.stop_ts {
-                    //     if current_ts >= stop_ts {
-                    //         tracing::info!("Reached stop timestamp, exiting");
-                    //         break;
-                    //     }
-                    // }
-                }
-            }
+            current_ts = chunk_end;
 
-            tracing::debug!("Sleeping for {:?}...", request_interval);
-            tokio_sleep(Duration::from_millis(request_interval)).await;
+            let percentage = ((chunk_end - start_ts) as f64 / (stop_ts - start_ts) as f64) * 100.0;
+            tracing::info!("Progress: {:.2}% of backfill range completed", percentage);
+
+            tokio_sleep(Duration::from_millis(backfill_opts.request_interval)).await;
         }
 
         Ok(())
     }
 
-    async fn get_processors_max_timestamp(&self) -> Result<u64, anyhow::Error> {
-        let mut max_ts = 0u64;
-        for processor_config in &self.processor_configs {
-            let processor = processor_config.build_processor(self.db_pool.clone());
-            let processor_name = processor.name().to_string();
+    pub async fn run_sync(&self) -> Result<()> {
+        let request_interval = self.sync_opts.unwrap().request_interval;
+        let step = self.sync_opts.unwrap().step;
+        let backstep = self.sync_opts.unwrap().backstep;
 
-            match bento_types::repository::processor_status::get_last_timestamp(
-                &self.db_pool,
-                &processor_name,
-                (self.client.network).clone().into(),
-                true,
-            )
+        loop {
+            // Get the most recent block timestamp from the database or node
+            // and start syncing from there
+            let mut current_ts = get_max_block_timestamp(&self.db_pool)
+                .await?
+                .map(|ts| ts as u64)
+                //TODO: If the database is empty, get the most recent block timestamp from the node
+                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() as u64)
+                - backstep;
+
+            let now = chrono::Utc::now().timestamp_millis() as u64;
+            println!(
+                "Current timestamp: {}, Now: {}, Step: {}, Backstep: {}",
+                current_ts, now, step, backstep
+            );
+            // Process in chunks of 'step' size until we reach 'now'
+            while current_ts < now {
+                let chunk_end = std::cmp::min(current_ts + step, now);
+
+                if current_ts >= chunk_end {
+                    break; // No more data to process
+                }
+
+                tracing::info!("Processing sync chunk: {} to {}", current_ts, chunk_end);
+
+                self.sync_range(current_ts, chunk_end).await?;
+
+                current_ts = chunk_end;
+            }
+
+            tokio_sleep(Duration::from_millis(request_interval)).await;
+        }
+    }
+
+    /// Syncs the blocks in the range [start_ts, stop_ts].
+    /// This method will fetch blocks in batches and process them using the configured processors.
+    async fn sync_range(&self, start_ts: u64, stop_ts: u64) -> Result<()> {
+        let range = BlockRange {
+            from_ts: start_ts.try_into().unwrap(),
+            to_ts: stop_ts.try_into().unwrap(),
+        };
+
+        tracing::info!("Syncing blocks in range: {:?}", range);
+
+        //TODO: Handle failure gracefully instead of panicking
+        let batches = fetch_parallel(self.client.clone(), range, self.workers).await?;
+
+        if batches.is_empty() {
+            tracing::warn!("No blocks found in the specified range");
+            return Ok(());
+        }
+
+        self.run_pipeline(batches).await?;
+
+        Ok(())
+    }
+
+    /// Syncs the blocks at a specific height.
+    async fn sync_at_height(&self, height: u64) -> Result<()> {
+        let groups = self.get_groups();
+
+        let block_hash_futures: Vec<_> = groups
+            .iter()
+            .map(|(from_group, to_group)| {
+                self.client.get_block_hash_by_height(height, *from_group, *to_group)
+            })
+            .collect();
+
+        let block_hashes = futures::future::join_all(block_hash_futures)
             .await
-            {
-                Ok(ts) => {
-                    if ts > max_ts.try_into().unwrap() {
-                        max_ts = ts.try_into().unwrap();
-                        tracing::info!(
-                            processor = processor_name,
-                            last_timestamp = max_ts,
-                            "Found last timestamp"
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if block_hashes.is_empty() {
+            tracing::warn!("No blocks found at height {}", height);
+            return Ok(());
+        }
+
+        let block_futures: Vec<_> = block_hashes
+            .iter()
+            .map(|hashes| self.client.get_block_and_events_by_hash(&hashes[0]))
+            .collect();
+        let blocks = futures::future::join_all(block_futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.run_pipeline(vec![BlockBatch { blocks, range: BlockRange { from_ts: 0, to_ts: 0 } }])
+            .await?;
+
+        Ok(())
+    }
+
+    fn get_groups(&self) -> Vec<(u32, u32)> {
+        let mut groups = Vec::new();
+        for from_group in 0..DEFAULT_GROUP_NUM {
+            for to_group in 0..DEFAULT_GROUP_NUM {
+                groups.push((from_group as u32, to_group as u32));
+            }
+        }
+        groups
+    }
+
+    async fn run_pipeline(&self, batches: Vec<BlockBatch>) -> Result<()> {
+        let mut processors_results = Vec::new();
+        for processor_config in &self.processor_configs {
+            let pool_clone = self.db_pool.clone();
+            let client_clone = self.client.clone();
+            let processor = processor_config.build_processor(pool_clone.clone());
+            let processor_name = processor.name().to_string();
+            let batches_clone = batches.clone();
+            let pipeline = Pipeline::new(client_clone.clone(), pool_clone.clone(), processor);
+
+            //TODO: Refactor this
+            let result = tokio::spawn(async move {
+                match pipeline.run(batches_clone).await {
+                    Ok(_) => {
+                        tracing::debug!(
+                            processor_name = processor_name,
+                            "Processor executed successfully"
                         );
+                        Ok(())
+                    }
+                    Err(err) => {
+                        tracing::error!(
+                            processor_name = processor_name,
+                            error = ?err,
+                            "Processor execution failed"
+                        );
+                        Err(anyhow::anyhow!("Processor execution failed: {}", err))
                     }
                 }
-                Err(_) => {
-                    max_ts = chrono::Utc::now().timestamp_millis() as u64;
-                    tracing::info!(
-                        processor = processor_name,
-                        "No previous timestamp found for processor, this appears to be the first run"
-                    );
+            });
+            processors_results.push(result);
+        }
+
+        for result in futures::future::join_all(processors_results).await {
+            match result {
+                Ok(Ok(_)) => {} // Processor completed successfully
+                Ok(Err(e)) => {
+                    tracing::error!(error = ?e, "Processor failed");
+                }
+                Err(e) => {
+                    tracing::error!(error = ?e, "Task panicked");
                 }
             }
         }
-        Ok(max_ts)
+
+        Ok(())
     }
 
     // For the normal processor build we just use standard Diesel with the postgres
