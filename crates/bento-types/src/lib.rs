@@ -23,7 +23,7 @@ pub type DbPoolConnection<'a> = PooledConnection<'a, AsyncPgConnection>;
 
 pub const DEFAULT_GROUP_NUM: i64 = 4;
 pub const REORG_TIMEOUT: i64 = 210 * 16 * 1000; // 210 blocks * 16 seconds
-pub const MAX_TIMESTAMP_RANGE: i64 = 1800000;
+pub const MAX_TIMESTAMP_RANGE: u64 = 1800000;
 
 pub type Event = ContractEventByBlockHash;
 pub type BlockHash = String;
@@ -263,14 +263,19 @@ pub enum StageMessage {
 
 #[derive(Clone, Copy, Debug)]
 pub struct BlockRange {
-    pub from_ts: i64,
-    pub to_ts: i64,
+    pub from_ts: u64,
+    pub to_ts: u64,
 }
 
 #[derive(Clone, Debug)]
 pub struct BlockBatch {
     pub blocks: Vec<BlockAndEvents>,
     pub range: BlockRange,
+}
+
+#[derive(Deserialize)]
+pub struct BlockHashesResponse {
+    pub headers: Vec<String>,
 }
 
 #[cfg(test)]

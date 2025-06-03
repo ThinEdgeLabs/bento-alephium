@@ -45,12 +45,7 @@ impl ProcessorTrait for TxProcessor {
         &self.connection_pool
     }
 
-    async fn process_blocks(
-        &self,
-        _from: i64,
-        _to: i64,
-        blocks: Vec<BlockAndEvents>,
-    ) -> Result<ProcessorOutput> {
+    async fn process_blocks(&self, blocks: Vec<BlockAndEvents>) -> Result<ProcessorOutput> {
         let models = convert_bwe_to_tx_models(blocks);
         Ok(ProcessorOutput::Tx(models))
     }

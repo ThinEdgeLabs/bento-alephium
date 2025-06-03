@@ -13,8 +13,8 @@ pub trait BlockProvider {
     // List blocks with events on the given time interval.
     async fn get_blocks_and_events(
         &self,
-        from_ts: i64,
-        to_ts: i64,
+        from_ts: u64,
+        to_ts: u64,
     ) -> Result<BlocksAndEventsPerTimestampRange>;
 
     // Get a block with hash.
@@ -24,6 +24,13 @@ pub trait BlockProvider {
     async fn get_block_and_events_by_hash(&self, block_hash: &str) -> Result<BlockAndEvents>;
 
     async fn get_block_header(&self, block_hash: &str) -> Result<BlockHeaderEntry>;
+
+    async fn get_block_hash_by_height(
+        &self,
+        height: u64,
+        from_group: u32,
+        to_group: u32,
+    ) -> Result<Vec<String>>;
 }
 
 #[async_trait]

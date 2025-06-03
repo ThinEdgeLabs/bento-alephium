@@ -19,10 +19,7 @@ impl StageHandler for ProcessorStage {
     async fn handle(&self, msg: StageMessage) -> Result<StageMessage> {
         match msg {
             StageMessage::Batch(batch) => {
-                let output = self
-                    .processor
-                    .process_blocks(batch.range.from_ts, batch.range.to_ts, batch.blocks)
-                    .await?;
+                let output = self.processor.process_blocks(batch.blocks).await?;
                 Ok(StageMessage::Processed(output))
             }
             _ => Ok(msg),

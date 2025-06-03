@@ -11,8 +11,8 @@ pub async fn fetch_parallel<T: BlockProvider + 'static>(
     range: BlockRange,
     num_workers: usize,
 ) -> Result<Vec<BlockBatch>> {
-    let total_time: i64 = range.to_ts - range.from_ts;
-    let chunk_size = total_time / num_workers as i64;
+    let total_time = range.to_ts - range.from_ts;
+    let chunk_size = total_time / num_workers as u64;
 
     tracing::debug!(
         "Starting parallel fetch with {} workers for range {}-{}",
@@ -24,7 +24,7 @@ pub async fn fetch_parallel<T: BlockProvider + 'static>(
     let mut futures = FuturesOrdered::new();
 
     for i in 0..num_workers {
-        let from = range.from_ts + (i as i64 * chunk_size);
+        let from = range.from_ts + (i as u64 * chunk_size);
         let to = if i == num_workers - 1 { range.to_ts } else { from + chunk_size };
 
         let range = BlockRange { from_ts: from, to_ts: to };
@@ -125,8 +125,8 @@ mod tests {
 
             async fn get_blocks_and_events(
                 &self,
-                from_ts: i64,
-                to_ts: i64,
+                from_ts: u64,
+                to_ts: u64,
             ) -> Result<BlocksAndEventsPerTimestampRange>;
 
             async fn get_block(&self, block_hash: &str) -> Result<BlockEntry>;
@@ -134,6 +134,13 @@ mod tests {
             async fn get_block_and_events_by_hash(&self, block_hash: &str) -> Result<BlockAndEvents>;
 
             async fn get_block_header(&self, block_hash: &str) -> Result<BlockHeaderEntry>;
+
+            async fn get_block_hash_by_height(
+                &self,
+                height: u64,
+                from_group: u32,
+                to_group: u32,
+            ) -> Result<Vec<String>>;
         }
     }
 
@@ -240,7 +247,7 @@ mod tests {
                 range.to_ts
             } else {
                 range.from_ts
-                    + ((i as i64 + 1) * ((range.to_ts - range.from_ts) / num_workers as i64))
+                    + ((i as u64 + 1) * ((range.to_ts - range.from_ts) / num_workers as u64))
             };
 
             assert_eq!(
@@ -368,10 +375,10 @@ mod tests {
     }
 
     // Helper function to create a test block
-    fn create_test_block(hash: &str, timestamp: i64) -> BlockEntry {
+    fn create_test_block(hash: &str, timestamp: u64) -> BlockEntry {
         BlockEntry {
             hash: hash.to_string(),
-            timestamp,
+            timestamp: timestamp as i64,
             chain_from: 1,
             chain_to: 2,
             height: 1000,

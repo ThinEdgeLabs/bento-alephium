@@ -77,18 +77,12 @@ impl ProcessorTrait for TransferProcessor {
         &self.connection_pool
     }
 
-    async fn process_blocks(
-        &self,
-        _from: i64,
-        _to: i64,
-        bwe: Vec<BlockAndEvents>,
-    ) -> Result<ProcessorOutput> {
+    async fn process_blocks(&self, bwe: Vec<BlockAndEvents>) -> Result<ProcessorOutput> {
         let mut all_transfers = Vec::new();
         for el in bwe {
             let mut transfers =
                 extract_transfers(&el.block.transactions, &el.block, &self.gas_payer_addresses);
             all_transfers.append(&mut transfers);
-            tracing::info!("Found {} token transfers", transfers.len());
         }
 
         Ok(ProcessorOutput::Custom(Arc::new(TransferProcessorOutput { transfers: all_transfers })))
@@ -101,7 +95,7 @@ impl ProcessorTrait for TransferProcessor {
                 let transfers = &transfer_output.transfers;
                 if !transfers.is_empty() {
                     self.repository.insert_transfers(transfers).await?;
-                    tracing::info!("Stored {} token transfers", transfers.len());
+                    tracing::info!("Inserted {} token transfers", transfers.len());
                 }
             } else {
                 return Err(anyhow::anyhow!("Invalid custom output type"));

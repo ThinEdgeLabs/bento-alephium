@@ -14,12 +14,7 @@ pub trait ProcessorTrait: Send + Sync + Debug + 'static {
     fn connection_pool(&self) -> &Arc<DbPool>;
 
     /// Process a batch of blocks and produce output
-    async fn process_blocks(
-        &self,
-        from_ts: i64,
-        to_ts: i64,
-        blocks: Vec<BlockAndEvents>,
-    ) -> Result<ProcessorOutput>;
+    async fn process_blocks(&self, blocks: Vec<BlockAndEvents>) -> Result<ProcessorOutput>;
 
     /// Store the processing output
     async fn store_output(&self, output: ProcessorOutput) -> Result<()>;
