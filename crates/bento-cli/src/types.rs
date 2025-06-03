@@ -135,6 +135,8 @@ pub struct WorkerConfig {
     pub rpc_url: Option<String>,
     pub network: String,
     pub request_interval: u64,
+    pub step: u64,
+    pub backstep: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

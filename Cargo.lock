@@ -1833,8 +1833,10 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "axum",
  "bento-cli",
  "bento-core",
+ "bento-server",
  "bento-trait",
  "bento-types",
  "bigdecimal",
@@ -1852,6 +1854,9 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "utoipa-swagger-ui",
 ]
 
 [[package]]

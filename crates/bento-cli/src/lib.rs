@@ -79,15 +79,15 @@ pub async fn new_realtime_worker_from_config(
     processor_factories: &HashMap<String, ProcessorFactory>,
 ) -> Result<Worker> {
     let workers: usize = 2;
+    let step = config.worker.step;
+    let backstep = config.worker.backstep;
+    let request_interval = config.worker.request_interval;
+
     new_worker_from_config(
         config,
         processor_factories,
         workers,
-        Some(SyncOptions {
-            step: 0,
-            backstep: 0,
-            request_interval: config.worker.request_interval,
-        }),
+        Some(SyncOptions { step, backstep, request_interval }),
         None,
     )
     .await
