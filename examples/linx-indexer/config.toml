@@ -1,20 +1,19 @@
 [worker]
 database_url = "postgresql://postgres:postgres@localhost:5432/bento_alephium"
 network = "mainnet"
-rpc_url = "https://alephium.linxlabs.org"
-start = 1716560632750
+request_interval = 5000
 step = 1800000
-request_interval = 1000
-workers = 2
+backstep = 60000
 
 [server]
 port = "8080"
 
 [backfill]
-start = 1746594420000
-stop = 1746598891136
-request_interval = 1000
+workers = 4
+request_interval = 100 # 5 seconds
+step = 1800000         # 30 minutes
+backstep = 60000       # 1 minute backstep
 
 [processors.transfers]
 name = "transfers"
-gas_payer_addresses = ["1C44MNPDY8rNKwaeyrYCF2FPT6rXhNUNtP7fQv81PKjwq"]
+gas_payer_addresses = []
