@@ -113,13 +113,13 @@ async fn root() -> &'static str {
 #[allow(clippy::let_and_return)]
 pub fn configure_api(custom_router: Option<OpenApiRouter<AppState>>) -> OpenApiRouter<AppState> {
     let router = OpenApiRouter::new()
-        .nest("/blocks", BlockApiModule::register())
-        .nest("/events", EventApiModule::register())
-        .nest("/transactions", TransactionApiModule::register())
+        .nest("/v1/blocks", BlockApiModule::register())
+        .nest("/v1/events", EventApiModule::register())
+        .nest("/v1/transactions", TransactionApiModule::register())
         .route("/", get(root));
 
     if let Some(custom_router) = custom_router {
-        router.merge(custom_router)
+        router.nest("/v1", custom_router)
     } else {
         router
     }
