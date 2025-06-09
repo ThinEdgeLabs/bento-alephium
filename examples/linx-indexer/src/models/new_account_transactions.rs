@@ -50,7 +50,7 @@ pub struct NewContractCallTransactionDto {
     #[serde(flatten)]
     pub account_transaction: NewAccountTransaction,
     #[serde(flatten)]
-    pub contract: NewContractCallDetails,
+    pub contract_call: NewContractCallDetails,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -72,5 +72,5 @@ pub struct NewSwapDetails {
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct NewContractCallDetails {
-    pub contract_id: String,
+    pub contract_address: String,
 }

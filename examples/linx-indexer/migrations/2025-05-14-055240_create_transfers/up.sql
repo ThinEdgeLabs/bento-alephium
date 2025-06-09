@@ -22,3 +22,12 @@ CREATE TABLE transfers (
 );
 
 CREATE UNIQUE INDEX unique_transfers ON transfers (tx_id, token_id, from_address, to_address, amount);
+
+CREATE TABLE contract_calls (
+    id BIGSERIAL PRIMARY KEY,
+    account_transaction_id BIGINT NOT NULL REFERENCES account_transactions(id) ON DELETE CASCADE,
+    contract_address TEXT NOT NULL,
+    tx_id TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX unique_contract_calls ON contract_calls (tx_id, contract_address);

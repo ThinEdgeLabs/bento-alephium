@@ -75,8 +75,9 @@ impl BlockProvider for Client {
                         if status.is_server_error() && attempt < max_attempts {
                             if let Some(duration) = backoff.next_backoff() {
                                 tracing::warn!(
-                                    "API returned error status: {}. Retrying in {:?}...",
+                                    "API returned error status: {}. Error: {}. Retrying in {:?}...",
                                     status,
+                                    response.text().await.unwrap_or_default(),
                                     duration
                                 );
                                 tokio::time::sleep(duration).await;

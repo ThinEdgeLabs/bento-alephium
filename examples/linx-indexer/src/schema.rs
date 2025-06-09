@@ -33,6 +33,15 @@ diesel::table! {
 }
 
 diesel::table! {
+    contract_calls (id) {
+        id -> Int8,
+        account_transaction_id -> Int8,
+        contract_address -> Text,
+        tx_id -> Text,
+    }
+}
+
+diesel::table! {
     events (id) {
         id -> Text,
         tx_id -> Text,
@@ -103,11 +112,13 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(contract_calls -> account_transactions (account_transaction_id));
 diesel::joinable!(transfers -> account_transactions (account_transaction_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     account_transactions,
     blocks,
+    contract_calls,
     events,
     loan_actions,
     loan_details,

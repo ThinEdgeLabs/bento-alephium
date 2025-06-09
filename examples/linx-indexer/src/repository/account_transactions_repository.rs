@@ -1,4 +1,4 @@
-use crate::models::{AccountTransaction, NewTransferTransactionDto};
+use crate::models::{AccountTransaction, NewContractCallTransactionDto, NewTransferTransactionDto};
 use crate::models::{AccountTransactionDetails, TransferDetails, TransferTransactionDto};
 use anyhow::Result;
 use bento_types::DbPool;
@@ -82,6 +82,67 @@ impl AccountTransactionRepository {
         Ok(result)
     }
 
+    pub async fn insert_contract_calls(
+        &self,
+        dtos: &Vec<NewContractCallTransactionDto>,
+    ) -> Result<()> {
+        if dtos.is_empty() {
+            return Ok(());
+        }
+
+        let mut conn = self.db_pool.get().await?;
+
+        let result = conn
+            .transaction::<_, diesel::result::Error, _>(|conn| {
+                async move {
+                    use crate::schema::{account_transactions, contract_calls};
+
+                    let account_txs: Vec<_> = dtos
+                        .iter()
+                        .map(|dto| {
+                            let mut account_tx = dto.account_transaction.clone();
+                            account_tx.tx_type = "contract_call".to_string();
+                            account_tx
+                        })
+                        .collect();
+
+                    let inserted_account_txs: Vec<AccountTransaction> =
+                        diesel::insert_into(account_transactions::table)
+                            .values(&account_txs)
+                            .on_conflict_do_nothing()
+                            .returning(AccountTransaction::as_returning())
+                            .get_results(conn)
+                            .await?;
+
+                    let contract_call_values: Vec<_> = inserted_account_txs
+                        .iter()
+                        .zip(dtos.iter())
+                        .map(|(inserted_tx, dto)| {
+                            (
+                                contract_calls::account_transaction_id.eq(inserted_tx.id),
+                                contract_calls::contract_address
+                                    .eq(&dto.contract_call.contract_address),
+                                contract_calls::tx_id.eq(&inserted_tx.tx_id),
+                            )
+                        })
+                        .collect();
+
+                    diesel::insert_into(contract_calls::table)
+                        .values(&contract_call_values)
+                        .on_conflict((contract_calls::tx_id, contract_calls::contract_address))
+                        .do_nothing()
+                        .execute(conn)
+                        .await?;
+
+                    Ok(())
+                }
+                .scope_boxed()
+            })
+            .await?;
+
+        Ok(result)
+    }
+
     pub async fn get_account_transactions(
         &self,
         address: &str,
@@ -124,8 +185,6 @@ impl AccountTransactionRepository {
                 )
             })
             .collect();
-
-        // TODO: Query swaps and contract_calls tables
 
         let mut transaction_details = Vec::new();
         for account_tx in account_txs {

@@ -160,7 +160,6 @@ pub struct ProcessorsConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessorTypeConfig {
-    pub name: String,
     #[serde(flatten)]
     pub config: HashMap<String, serde_json::Value>,
 }

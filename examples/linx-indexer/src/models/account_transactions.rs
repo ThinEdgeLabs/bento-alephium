@@ -58,7 +58,7 @@ pub struct ContractCallTransactionDto {
     #[serde(flatten)]
     pub account_transaction: AccountTransaction,
     #[serde(flatten)]
-    pub contract: ContractCallDetails,
+    pub contract_call: ContractCallDetails,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]

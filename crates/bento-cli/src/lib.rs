@@ -13,45 +13,41 @@ use bento_core::{
     ProcessorFactory,
 };
 use bento_server::{start, AppState, Config as ServerConfig};
-use constants::{DEFAULT_BLOCK_PROCESSOR, DEFAULT_EVENT_PROCESSOR, DEFAULT_TX_PROCESSOR};
 use std::{collections::HashMap, fs, path::Path};
 use utoipa_axum::router::OpenApiRouter;
 
 async fn new_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
+    include_default_processors: bool,
     workers: usize,
     sync_options: Option<SyncOptions>,
     backfill_options: Option<BackfillOptions>,
 ) -> Result<Worker> {
     let worker_config = &config.worker;
 
-    // Create processor configurations
     let mut processors = Vec::new();
 
-    // Add processors from config based on what's available in processor_factories
-    if let Some(processors_config) = &config.processors {
-        for (processor_type, processor_config) in processors_config.processors.iter() {
-            if let Some(factory) = processor_factories.get(processor_type) {
-                let processor_config = ProcessorConfig::Custom {
-                    name: processor_config.name.clone(),
-                    factory: *factory,
-                    args: Some(serde_json::to_value(processor_config)?),
-                };
-                processors.push(processor_config);
-            }
-        }
+    if include_default_processors {
+        processors.extend(vec![
+            ProcessorConfig::BlockProcessor,
+            ProcessorConfig::EventProcessor,
+            ProcessorConfig::TxProcessor,
+        ]);
     }
 
-    // Add default processors if exists in the factories
-    if processor_factories.contains_key(DEFAULT_BLOCK_PROCESSOR) {
-        processors.push(ProcessorConfig::BlockProcessor);
-    }
-    if processor_factories.contains_key(DEFAULT_EVENT_PROCESSOR) {
-        processors.push(ProcessorConfig::EventProcessor);
-    }
-    if processor_factories.contains_key(DEFAULT_TX_PROCESSOR) {
-        processors.push(ProcessorConfig::TxProcessor);
+    for (processor_name, processor_factory) in processor_factories.iter() {
+        let custom_processor_config =
+            config.processors.as_ref().and_then(|p| p.processors.get(processor_name));
+
+        let processor_config = ProcessorConfig::Custom {
+            name: processor_name.clone(),
+            factory: *processor_factory,
+            args: custom_processor_config
+                .is_some()
+                .then_some(serde_json::to_value(custom_processor_config)?),
+        };
+        processors.push(processor_config);
     }
 
     let network: Network;
@@ -77,6 +73,7 @@ async fn new_worker_from_config(
 pub async fn new_realtime_worker_from_config(
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
+    include_default_processors: bool,
 ) -> Result<Worker> {
     let workers: usize = 2;
     let step = config.worker.step;
@@ -86,6 +83,7 @@ pub async fn new_realtime_worker_from_config(
     new_worker_from_config(
         config,
         processor_factories,
+        include_default_processors,
         workers,
         Some(SyncOptions { step, backstep, request_interval }),
         None,
@@ -98,6 +96,7 @@ pub async fn new_backfill_worker_from_config(
     stop_ts: Option<u64>,
     config: &Config,
     processor_factories: &HashMap<String, ProcessorFactory>,
+    include_default_processors: bool,
 ) -> Result<Worker> {
     let workers = config.backfill.workers;
     let step = config.backfill.step;
@@ -107,6 +106,7 @@ pub async fn new_backfill_worker_from_config(
     new_worker_from_config(
         config,
         processor_factories,
+        include_default_processors,
         workers,
         None,
         Some(BackfillOptions { start_ts, stop_ts, step, backstep, request_interval }),
@@ -161,24 +161,6 @@ pub async fn run_command(
     router: Option<OpenApiRouter<AppState>>,
     include_default_processors: bool,
 ) -> Result<()> {
-    let mut processor_factories = processor_factories;
-    if include_default_processors {
-        processor_factories.insert(
-            DEFAULT_BLOCK_PROCESSOR.to_string(),
-            bento_core::processors::block_processor::processor_factory(),
-        );
-
-        processor_factories.insert(
-            DEFAULT_EVENT_PROCESSOR.to_string(),
-            bento_core::processors::event_processor::processor_factory(),
-        );
-
-        processor_factories.insert(
-            DEFAULT_TX_PROCESSOR.to_string(),
-            bento_core::processors::tx_processor::processor_factory(),
-        );
-    }
-
     tracing_subscriber::fmt::init();
 
     let cli = Cli::parse();
@@ -204,7 +186,12 @@ pub async fn run_command(
 
                 println!("⚙️  Running real-time indexer with config: {}", args.config_path);
 
-                let worker = new_realtime_worker_from_config(&config, &processor_factories).await?;
+                let worker = new_realtime_worker_from_config(
+                    &config,
+                    &processor_factories,
+                    include_default_processors,
+                )
+                .await?;
 
                 println!("🚀 Starting real-time indexer");
 
@@ -218,6 +205,7 @@ pub async fn run_command(
                     args.stop,
                     &config,
                     &processor_factories,
+                    include_default_processors,
                 )
                 .await?;
 
@@ -233,7 +221,12 @@ pub async fn run_command(
 
                 let config = args.clone().into();
 
-                let worker = new_realtime_worker_from_config(&config, &processor_factories).await?;
+                let worker = new_realtime_worker_from_config(
+                    &config,
+                    &processor_factories,
+                    include_default_processors,
+                )
+                .await?;
 
                 // Get backfill status
                 let backfill_height =
@@ -279,6 +272,8 @@ mod tests {
             database_url = "postgres://user:password@localhost:5432/db"
             network = "testnet"
             request_interval = 500
+            step = 60000
+            backstep = 300000
 
             [server]
             port = "8080"
@@ -287,9 +282,9 @@ mod tests {
             request_interval = 1000
             workers = 2
             step = 1800000
+            backstep = 600000
 
             [processors.custom_processor]
-            name = "custom"
             field1 = "value1"
             field2 = 42
         "#;
@@ -320,7 +315,6 @@ mod tests {
         let processors = config.processors.unwrap();
         assert!(processors.processors.contains_key("custom_processor"));
         let custom_processor = &processors.processors["custom_processor"];
-        assert_eq!(custom_processor.name, "custom");
         assert_eq!(custom_processor.config["field1"], serde_json::json!("value1"));
         assert_eq!(custom_processor.config["field2"], serde_json::json!(42));
     }

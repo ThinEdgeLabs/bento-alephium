@@ -1,4 +1,5 @@
 use anyhow::Result;
+use bento_cli::constants::{ALPH_TOKEN_ID, DUST_AMOUNT};
 use bento_types::{BlockEntry, CustomProcessorOutput, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -14,10 +15,8 @@ use bento_types::{
 use bigdecimal::BigDecimal;
 
 use crate::models::{NewAccountTransaction, NewTransferDetails, NewTransferTransactionDto};
+use crate::processors::classifier::{TransactionCategory, TransactionClassifier};
 use crate::repository::AccountTransactionRepository;
-
-const ALPH_TOKEN_ID: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-const DUST_AMOUNT: &str = "1000000000000000"; // 0.001 ALPH
 
 pub fn processor_factory() -> ProcessorFactory {
     |db_pool, args: Option<serde_json::Value>| Box::new(TransferProcessor::new(db_pool, args))
@@ -27,6 +26,7 @@ pub struct TransferProcessor {
     connection_pool: Arc<DbPool>,
     gas_payer_addresses: HashSet<String>,
     repository: AccountTransactionRepository,
+    classifier: TransactionClassifier,
 }
 
 impl TransferProcessor {
@@ -37,7 +37,8 @@ impl TransferProcessor {
             .and_then(|v| serde_json::from_value(v).ok())
             .unwrap_or_default();
         let repository = AccountTransactionRepository::new(connection_pool.clone());
-        Self { connection_pool, gas_payer_addresses, repository }
+        let classifier = TransactionClassifier::new(HashSet::new());
+        Self { connection_pool, gas_payer_addresses, repository, classifier }
     }
 }
 
@@ -78,12 +79,18 @@ impl ProcessorTrait for TransferProcessor {
     }
 
     async fn process_blocks(&self, bwe: Vec<BlockAndEvents>) -> Result<ProcessorOutput> {
-        let mut all_transfers = Vec::new();
-        for el in bwe {
-            let mut transfers =
-                extract_transfers(&el.block.transactions, &el.block, &self.gas_payer_addresses);
-            all_transfers.append(&mut transfers);
-        }
+        let all_transfers = bwe
+            .iter()
+            .flat_map(|el| {
+                el.block
+                    .transactions
+                    .iter()
+                    .filter(|tx| self.classifier.classify(tx) == TransactionCategory::Transfer)
+                    .flat_map(|tx| {
+                        extract_token_transfers(tx, &el.block, &self.gas_payer_addresses)
+                    })
+            })
+            .collect();
 
         Ok(ProcessorOutput::Custom(Arc::new(TransferProcessorOutput { transfers: all_transfers })))
     }
@@ -108,33 +115,7 @@ impl ProcessorTrait for TransferProcessor {
     }
 }
 
-pub fn extract_transfers(
-    transactions: &[Transaction],
-    block: &BlockEntry,
-    gas_payer_addresses: &HashSet<String>,
-) -> Vec<NewTransferTransactionDto> {
-    let mut transfers = Vec::new();
-    for tx in transactions {
-        if !tx.script_execution_ok {
-            continue; // Skip failed transactions
-        }
-        let is_contract_transaction =
-            !tx.contract_inputs.is_empty() || !tx.generated_outputs.is_empty();
-        if is_contract_transaction {
-            continue; // Skip contract transactions
-        }
-        let is_block_reward = tx.unsigned.inputs.is_empty() && tx.unsigned.fixed_outputs.len() == 1;
-        if is_block_reward {
-            continue; // Skip block rewards
-        }
-        let token_transfers = extract_token_transfer(tx, block, gas_payer_addresses);
-        transfers.extend(token_transfers);
-    }
-
-    transfers
-}
-
-fn extract_token_transfer(
+fn extract_token_transfers(
     tx: &Transaction,
     block: &BlockEntry,
     gas_payer_addresses: &HashSet<String>,
@@ -159,7 +140,7 @@ fn extract_token_transfer(
 
     // Early exit if inputs come from more than one address and none are known gas payers
     if input_addresses.len() > 1 {
-        let gas_payer_present = input_addresses.intersection(gas_payer_addresses).next().is_some();
+        let gas_payer_present = input_addresses.intersection(&gas_payer_addresses).next().is_some();
 
         if !gas_payer_present {
             return vec![]; // Skip ambiguous multi-input txs
@@ -266,7 +247,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert_eq!(
@@ -300,7 +281,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert_eq!(transfers, vec![]); // Block rewards should be skipped
@@ -314,7 +295,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert_eq!(
@@ -350,7 +331,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert_eq!(
@@ -385,7 +366,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert_eq!(
@@ -419,7 +400,7 @@ mod tests {
         let gas_payer_addresses = load_gas_payer_addresses_fixture();
 
         // When
-        let transfers = extract_transfers(&[transaction], &block, &gas_payer_addresses);
+        let transfers = extract_token_transfers(&transaction, &block, &gas_payer_addresses);
 
         // Then
         assert!(
