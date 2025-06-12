@@ -23,63 +23,53 @@ impl AccountTransactionRepository {
 
         let mut conn = self.db_pool.get().await?;
 
-        let result = conn
-            .transaction::<_, diesel::result::Error, _>(|conn| {
-                async move {
-                    use crate::schema::{account_transactions, transfers};
+        for dto in dtos {
+            let mut account_tx = dto.account_transaction.clone();
+            account_tx.tx_type = "transfer".to_string();
+            let transfer = dto.transfer.clone();
 
-                    let account_txs: Vec<_> = dtos
-                        .iter()
-                        .map(|dto| {
-                            let mut account_tx = dto.account_transaction.clone();
-                            account_tx.tx_type = "transfer".to_string();
-                            account_tx
-                        })
-                        .collect();
+            let result = conn
+                .transaction::<_, diesel::result::Error, _>(|conn| {
+                    async move {
+                        use crate::schema::{account_transactions, transfers};
 
-                    let inserted_account_txs: Vec<AccountTransaction> =
-                        diesel::insert_into(account_transactions::table)
-                            .values(&account_txs)
-                            .on_conflict_do_nothing()
-                            .returning(AccountTransaction::as_returning())
-                            .get_results(conn)
+                        // Insert account transaction
+                        let inserted_account_tx: AccountTransaction =
+                            diesel::insert_into(account_transactions::table)
+                                .values(&account_tx)
+                                .returning(AccountTransaction::as_returning())
+                                .get_result(conn)
+                                .await?;
+
+                        // Insert transfer - this will fail if duplicate exists
+                        diesel::insert_into(transfers::table)
+                            .values((
+                                transfers::account_transaction_id.eq(inserted_account_tx.id),
+                                transfers::token_id.eq(&transfer.token_id),
+                                transfers::from_address.eq(&transfer.from_address),
+                                transfers::to_address.eq(&transfer.to_address),
+                                transfers::amount.eq(&transfer.amount),
+                                transfers::tx_id.eq(&inserted_account_tx.tx_id),
+                            ))
+                            .execute(conn)
                             .await?;
 
-                    let transfer_values: Vec<_> = inserted_account_txs
-                        .iter()
-                        .zip(dtos.iter())
-                        .map(|(inserted_tx, dto)| {
-                            (
-                                transfers::account_transaction_id.eq(inserted_tx.id),
-                                transfers::token_id.eq(&dto.transfer.token_id),
-                                transfers::from_address.eq(&dto.transfer.from_address),
-                                transfers::to_address.eq(&dto.transfer.to_address),
-                                transfers::amount.eq(&dto.transfer.amount),
-                                transfers::tx_id.eq(&inserted_tx.tx_id),
-                            )
-                        })
-                        .collect();
+                        Ok(())
+                    }
+                    .scope_boxed()
+                })
+                .await;
 
-                    diesel::insert_into(transfers::table)
-                        .values(&transfer_values)
-                        .on_conflict((
-                            transfers::tx_id,
-                            transfers::token_id,
-                            transfers::from_address,
-                            transfers::to_address,
-                            transfers::amount,
-                        ))
-                        .do_nothing()
-                        .execute(conn)
-                        .await?;
+            if let Err(e) = result {
+                tracing::debug!(
+                    "Failed to insert transfer for tx_id {}: {}",
+                    dto.account_transaction.tx_id,
+                    e
+                );
+            }
+        }
 
-                    Ok(())
-                }
-                .scope_boxed()
-            })
-            .await?;
-
-        Ok(result)
+        Ok(())
     }
 
     pub async fn insert_contract_calls(
@@ -92,55 +82,51 @@ impl AccountTransactionRepository {
 
         let mut conn = self.db_pool.get().await?;
 
-        let result = conn
-            .transaction::<_, diesel::result::Error, _>(|conn| {
-                async move {
-                    use crate::schema::{account_transactions, contract_calls};
+        for dto in dtos {
+            let mut account_tx = dto.account_transaction.clone();
+            account_tx.tx_type = "contract_call".to_string();
+            let contract_call = dto.contract_call.clone();
 
-                    let account_txs: Vec<_> = dtos
-                        .iter()
-                        .map(|dto| {
-                            let mut account_tx = dto.account_transaction.clone();
-                            account_tx.tx_type = "contract_call".to_string();
-                            account_tx
-                        })
-                        .collect();
+            let result = conn
+                .transaction::<_, diesel::result::Error, _>(|conn| {
+                    async move {
+                        use crate::schema::{account_transactions, contract_calls};
 
-                    let inserted_account_txs: Vec<AccountTransaction> =
-                        diesel::insert_into(account_transactions::table)
-                            .values(&account_txs)
-                            .on_conflict_do_nothing()
-                            .returning(AccountTransaction::as_returning())
-                            .get_results(conn)
+                        // Insert account transaction
+                        let inserted_account_tx: AccountTransaction =
+                            diesel::insert_into(account_transactions::table)
+                                .values(&account_tx)
+                                .returning(AccountTransaction::as_returning())
+                                .get_result(conn)
+                                .await?;
+
+                        // Insert contract call - this will fail if duplicate exists
+                        diesel::insert_into(contract_calls::table)
+                            .values((
+                                contract_calls::account_transaction_id.eq(inserted_account_tx.id),
+                                contract_calls::contract_address
+                                    .eq(&contract_call.contract_address),
+                                contract_calls::tx_id.eq(&inserted_account_tx.tx_id),
+                            ))
+                            .execute(conn)
                             .await?;
 
-                    let contract_call_values: Vec<_> = inserted_account_txs
-                        .iter()
-                        .zip(dtos.iter())
-                        .map(|(inserted_tx, dto)| {
-                            (
-                                contract_calls::account_transaction_id.eq(inserted_tx.id),
-                                contract_calls::contract_address
-                                    .eq(&dto.contract_call.contract_address),
-                                contract_calls::tx_id.eq(&inserted_tx.tx_id),
-                            )
-                        })
-                        .collect();
+                        Ok(())
+                    }
+                    .scope_boxed()
+                })
+                .await;
 
-                    diesel::insert_into(contract_calls::table)
-                        .values(&contract_call_values)
-                        .on_conflict((contract_calls::tx_id, contract_calls::contract_address))
-                        .do_nothing()
-                        .execute(conn)
-                        .await?;
+            if let Err(e) = result {
+                tracing::debug!(
+                    "Failed to insert contract call for tx_id {}: {}",
+                    dto.account_transaction.tx_id,
+                    e
+                );
+            }
+        }
 
-                    Ok(())
-                }
-                .scope_boxed()
-            })
-            .await?;
-
-        Ok(result)
+        Ok(())
     }
 
     pub async fn get_account_transactions(
