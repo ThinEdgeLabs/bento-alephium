@@ -77,10 +77,33 @@ diesel::table! {
 }
 
 diesel::table! {
+    pools (id) {
+        id -> Int8,
+        address -> Text,
+        token_a -> Text,
+        token_b -> Text,
+        factory_address -> Text,
+    }
+}
+
+diesel::table! {
     processor_status (processor) {
         #[max_length = 50]
         processor -> Varchar,
         last_timestamp -> Int8,
+    }
+}
+
+diesel::table! {
+    swaps (id) {
+        id -> Int8,
+        account_transaction_id -> Int8,
+        token_in -> Text,
+        token_out -> Text,
+        amount_in -> Numeric,
+        amount_out -> Numeric,
+        pool_address -> Text,
+        tx_id -> Text,
     }
 }
 
@@ -113,6 +136,7 @@ diesel::table! {
 }
 
 diesel::joinable!(contract_calls -> account_transactions (account_transaction_id));
+diesel::joinable!(swaps -> account_transactions (account_transaction_id));
 diesel::joinable!(transfers -> account_transactions (account_transaction_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
@@ -122,7 +146,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     events,
     loan_actions,
     loan_details,
+    pools,
     processor_status,
+    swaps,
     transactions,
     transfers,
 );
