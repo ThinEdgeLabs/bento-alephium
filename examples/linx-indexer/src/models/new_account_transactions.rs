@@ -67,7 +67,8 @@ pub struct NewSwapDetails {
     pub token_out: String,
     pub amount_in: BigDecimal,
     pub amount_out: BigDecimal,
-    pub fee: BigDecimal,
+    pub pool_address: String,
+    pub tx_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]

@@ -80,8 +80,8 @@ pub struct SwapDetails {
     pub amount_in: BigDecimal,
     #[schema(value_type = String)]
     pub amount_out: BigDecimal,
-    #[schema(value_type = String)]
-    pub fee: BigDecimal,
+    pub pool_address: String,
+    pub tx_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
