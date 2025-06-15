@@ -34,3 +34,4 @@ axum.workspace = true
 utoipa-axum.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
+bs58 = "0.5.1"
