@@ -1,5 +1,9 @@
-use crate::models::{AccountTransaction, NewContractCallTransactionDto, NewTransferTransactionDto};
+use crate::models::{
+    AccountTransaction, NewContractCallTransactionDto, NewSwapTransactionDto,
+    NewTransferTransactionDto, SwapDetails, SwapTransactionDto,
+};
 use crate::models::{AccountTransactionDetails, TransferDetails, TransferTransactionDto};
+use crate::schema::swaps;
 use anyhow::Result;
 use bento_types::DbPool;
 use diesel::prelude::*;
@@ -129,6 +133,63 @@ impl AccountTransactionRepository {
         Ok(())
     }
 
+    pub async fn insert_swaps(&self, dtos: &Vec<NewSwapTransactionDto>) -> Result<()> {
+        if dtos.is_empty() {
+            return Ok(());
+        }
+
+        let mut conn = self.db_pool.get().await?;
+
+        for dto in dtos {
+            let mut account_tx = dto.account_transaction.clone();
+            account_tx.tx_type = "swap".to_string();
+            let swap = dto.swap.clone();
+
+            let result = conn
+                .transaction::<_, diesel::result::Error, _>(|conn| {
+                    async move {
+                        use crate::schema::account_transactions;
+
+                        // Insert account transaction
+                        let inserted_account_tx: AccountTransaction =
+                            diesel::insert_into(account_transactions::table)
+                                .values(&account_tx)
+                                .returning(AccountTransaction::as_returning())
+                                .get_result(conn)
+                                .await?;
+
+                        // Insert swap - this will fail if duplicate exists
+                        diesel::insert_into(swaps::table)
+                            .values((
+                                swaps::account_transaction_id.eq(inserted_account_tx.id),
+                                swaps::token_in.eq(&swap.token_in),
+                                swaps::token_out.eq(&swap.token_out),
+                                swaps::amount_in.eq(&swap.amount_in),
+                                swaps::amount_out.eq(&swap.amount_out),
+                                swaps::pool_address.eq(&swap.pool_address),
+                                swaps::tx_id.eq(&swap.tx_id),
+                            ))
+                            .execute(conn)
+                            .await?;
+
+                        Ok(())
+                    }
+                    .scope_boxed()
+                })
+                .await;
+
+            if let Err(e) = result {
+                tracing::debug!(
+                    "Failed to insert swap for tx_id {}: {}",
+                    dto.account_transaction.tx_id,
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn get_account_transactions(
         &self,
         address: &str,
@@ -172,6 +233,46 @@ impl AccountTransactionRepository {
             })
             .collect();
 
+        let swaps_map: std::collections::HashMap<i64, SwapDetails> = swaps::table
+            .filter(swaps::account_transaction_id.eq_any(&tx_ids))
+            .load::<(
+                i64,
+                i64,
+                String,
+                String,
+                bigdecimal::BigDecimal,
+                bigdecimal::BigDecimal,
+                String,
+                String,
+            )>(&mut conn)
+            .await?
+            .into_iter()
+            .map(
+                |(
+                    id,
+                    account_tx_id,
+                    token_in,
+                    token_out,
+                    amount_in,
+                    amount_out,
+                    pool_address,
+                    tx_id,
+                )| {
+                    (
+                        account_tx_id,
+                        SwapDetails {
+                            id,
+                            token_in,
+                            token_out,
+                            amount_in,
+                            amount_out,
+                            pool_address,
+                            tx_id,
+                        },
+                    )
+                },
+            )
+            .collect();
         let mut transaction_details = Vec::new();
         for account_tx in account_txs {
             match account_tx.tx_type.as_str() {
@@ -185,7 +286,16 @@ impl AccountTransactionRepository {
                         ));
                     }
                 }
-                // TODO: Add other transaction types
+                "swap" => {
+                    if let Some(swap) = swaps_map.get(&account_tx.id) {
+                        transaction_details.push(AccountTransactionDetails::Swap(
+                            SwapTransactionDto {
+                                account_transaction: account_tx,
+                                swap: swap.clone(),
+                            },
+                        ));
+                    }
+                }
                 _ => continue,
             }
         }
