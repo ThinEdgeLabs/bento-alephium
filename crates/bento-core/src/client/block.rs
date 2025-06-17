@@ -43,84 +43,20 @@ impl BlockProvider for Client {
         let endpoint = format!("blockflow/rich-blocks?fromTs={}&toTs={}", from_ts, to_ts);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
 
-        // Configure backoff for deserialization retries
-        let mut backoff = BackoffExp {
-            initial_interval: Duration::from_millis(100),
-            max_interval: Duration::from_secs(10),
-            ..BackoffExp::default()
-        };
+        // Let middleware handle all retries, fail fast on deserialization
+        let response = self.inner.get(url).send().await?;
 
-        let mut attempt = 0;
-        let max_attempts = 3;
-
-        loop {
-            attempt += 1;
-            tracing::debug!(
-                "Requesting blocks with events from: {} to: {} (attempt {}/{})",
-                from_ts,
-                to_ts,
-                attempt,
-                max_attempts
-            );
-
-            // The middleware will handle retries for the network request itself
-            let response_result = self.inner.get(url.clone()).send().await;
-
-            match response_result {
-                Ok(response) => {
-                    if !response.status().is_success() {
-                        let status = response.status();
-
-                        // For server errors, we might want to retry
-                        if status.is_server_error() && attempt < max_attempts {
-                            if let Some(duration) = backoff.next_backoff() {
-                                tracing::warn!(
-                                    "API returned error status: {}. Error: {}. Retrying in {:?}...",
-                                    status,
-                                    response.text().await.unwrap_or_default(),
-                                    duration
-                                );
-                                tokio::time::sleep(duration).await;
-                                continue;
-                            }
-                        }
-                        return Err(anyhow::anyhow!("API returned error status: {}", status));
-                    }
-
-                    // Try to deserialize with retry on deserialization errors
-                    match response.json::<BlocksAndEventsPerTimestampRange>().await {
-                        Ok(data) => return Ok(data),
-                        Err(e) => {
-                            tracing::error!("Failed to deserialize response: {:?}", e);
-                            tracing::error!("timestamp range: {} - {}", from_ts, to_ts);
-
-                            // Retry deserialization errors if we have attempts left
-                            if attempt < max_attempts {
-                                if let Some(duration) = backoff.next_backoff() {
-                                    tracing::warn!(
-                                        "Deserialization failed. Retrying in {:?}...",
-                                        duration
-                                    );
-                                    tokio::time::sleep(duration).await;
-                                    continue;
-                                }
-                            }
-
-                            return Err(anyhow::anyhow!("Error decoding response body: {:?}", e));
-                        }
-                    }
-                }
-                Err(e) => {
-                    // The middleware should have already retried network errors,
-                    // but if we get here, it means all retries failed
-                    return Err(anyhow::anyhow!(
-                        "Request failed after {} attempts: {:?}",
-                        attempt,
-                        e
-                    ));
-                }
-            }
+        if !response.status().is_success() {
+            return Err(anyhow::anyhow!("API returned error status: {}", response.status()));
         }
+
+        let data = response.json::<BlocksAndEventsPerTimestampRange>().await.map_err(|e| {
+            tracing::error!("Failed to deserialize response: {:?}", e);
+            tracing::error!("timestamp range: {} - {}", from_ts, to_ts);
+            anyhow::anyhow!("Error decoding response body: {:?}", e)
+        })?;
+
+        Ok(data)
     }
 
     // Get a block with hash.
