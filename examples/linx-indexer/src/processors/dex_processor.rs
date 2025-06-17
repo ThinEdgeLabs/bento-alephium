@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bento_core::{ProcessorFactory, db::DbPool};
 use bento_trait::processor::ProcessorTrait;
 use bento_types::{
-    BlockAndEvents, BlockEntry, ContractEventByBlockHash, CustomProcessorOutput, EventField,
+    BlockAndEvents, ContractEventByBlockHash, CustomProcessorOutput, EventField, RichBlockEntry,
     processors::ProcessorOutput, utils::timestamp_millis_to_naive_datetime,
 };
 use bigdecimal::Zero;
@@ -131,7 +131,7 @@ impl DexProcessor {
         &self,
         event: &ContractEventByBlockHash,
         pools: &HashMap<String, Pool>,
-        block: &BlockEntry,
+        block: &RichBlockEntry,
     ) -> Option<NewSwapTransactionDto> {
         match pools.get(event.contract_address.as_str()) {
             Some(pool) if pool.factory_address == AYIN_V2_FACTORY_ADDRESS => {
@@ -148,7 +148,7 @@ impl DexProcessor {
         &self,
         event: &ContractEventByBlockHash,
         pool: &Pool,
-        block: &BlockEntry,
+        block: &RichBlockEntry,
     ) -> Option<NewSwapTransactionDto> {
         // Elexium swap events have 6 fields and event_index 3
         if event.fields.len() != 6 || event.event_index != 3 {
@@ -208,7 +208,7 @@ impl DexProcessor {
         &self,
         event: &ContractEventByBlockHash,
         pool: &Pool,
-        block: &BlockEntry,
+        block: &RichBlockEntry,
     ) -> Option<NewSwapTransactionDto> {
         // Ayin V2 swap events have 6 fields and event_index 2
         if event.fields.len() != 6 || event.event_index != 2 {
@@ -313,6 +313,7 @@ impl ProcessorTrait for DexProcessor {
 
     async fn process_blocks(&self, bwe: Vec<BlockAndEvents>) -> Result<ProcessorOutput> {
         let mut swaps = Vec::new();
+        // This might be an issue if the number of pools is large
         let mut existing_pools = self.pool_repository.get_pools().await?;
         let mut new_pools: Vec<NewPoolDto> = Vec::new();
 

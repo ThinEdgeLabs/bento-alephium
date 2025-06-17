@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bento_cli::constants::{ALPH_TOKEN_ID, DUST_AMOUNT};
-use bento_types::{BlockEntry, CustomProcessorOutput, Transaction};
+use bento_types::{CustomProcessorOutput, RichBlockEntry, Transaction};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::{fmt::Debug, str::FromStr};
@@ -117,7 +117,7 @@ impl ProcessorTrait for TransferProcessor {
 
 fn extract_token_transfers(
     tx: &Transaction,
-    block: &BlockEntry,
+    block: &RichBlockEntry,
     gas_payer_addresses: &HashSet<String>,
 ) -> Vec<NewTransferTransactionDto> {
     let mut input_map: HashMap<(String, String), BigDecimal> = HashMap::new(); // (address, token_id) -> amount
@@ -231,7 +231,7 @@ mod tests {
         load_json_fixture(filename)
     }
 
-    fn load_block_fixture(filename: &str) -> BlockEntry {
+    fn load_block_fixture(filename: &str) -> RichBlockEntry {
         load_json_fixture(filename)
     }
 

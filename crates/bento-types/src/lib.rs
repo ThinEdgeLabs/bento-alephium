@@ -54,6 +54,24 @@ pub struct BlockEntry {
     pub chain_to: i64,
     pub height: i64,
     pub deps: Vec<String>,
+    pub nonce: String,
+    pub version: i8,
+    pub dep_state_hash: String,
+    pub txs_hash: String,
+    pub target: String,
+    pub parent: Option<BlockHash>,
+    pub main_chain: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RichBlockEntry {
+    pub hash: String,
+    pub timestamp: i64,
+    pub chain_from: i64,
+    pub chain_to: i64,
+    pub height: i64,
+    pub deps: Vec<String>,
     pub transactions: Vec<Transaction>,
     pub nonce: String,
     pub version: i8,
@@ -86,7 +104,7 @@ pub struct GhostUncleBlockEntry {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BlocksPerTimestampRange {
-    pub blocks: Vec<Vec<BlockEntry>>, // A list of block entries per timestamp range.
+    pub blocks: Vec<Vec<RichBlockEntry>>, // A list of block entries per timestamp range.
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
@@ -109,7 +127,7 @@ pub struct EventField {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockAndEvents {
-    pub block: BlockEntry,                     // The block entry.
+    pub block: RichBlockEntry,                 // The block entry.
     pub events: Vec<ContractEventByBlockHash>, // The list of events associated with the block.
 }
 
@@ -278,6 +296,12 @@ pub struct BlockHashesResponse {
     pub headers: Vec<String>,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ChainInfo {
+    pub current_height: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,7 +348,7 @@ mod tests {
             ]
         });
 
-        let block: BlockEntry = serde_json::from_value(json_data).unwrap();
+        let block: RichBlockEntry = serde_json::from_value(json_data).unwrap();
 
         assert_eq!(block.hash, "00000000000006f8c2bcaac93c5a23df8fba7119ba139d80a49d0303bbf84850");
         assert_eq!(block.timestamp, 1672531200);

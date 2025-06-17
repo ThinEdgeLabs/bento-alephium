@@ -1,10 +1,7 @@
-use std::time::Duration;
-
-use backoff::{backoff::Backoff, ExponentialBackoff as BackoffExp};
 use bento_trait::stage::BlockProvider;
 use bento_types::{
     BlockAndEvents, BlockEntry, BlockHashesResponse, BlockHeaderEntry,
-    BlocksAndEventsPerTimestampRange, BlocksPerTimestampRange,
+    BlocksAndEventsPerTimestampRange, BlocksPerTimestampRange, ChainInfo,
 };
 
 use anyhow::Result;
@@ -78,7 +75,7 @@ impl BlockProvider for Client {
     ///
     /// A `Result` containing a `BlockAndEvents` structure, or an error if the request fails.
     async fn get_block_and_events_by_hash(&self, block_hash: &str) -> Result<BlockAndEvents> {
-        let endpoint = format!("blockflow/blocks-with-events/{}", block_hash);
+        let endpoint = format!("blockflow/rich-blocks/{}", block_hash);
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
         let response = self.inner.get(url).send().await?.json().await?;
         Ok(response)
@@ -106,5 +103,13 @@ impl BlockProvider for Client {
         let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
         let response: BlockHashesResponse = self.inner.get(url).send().await?.json().await?;
         Ok(response.headers)
+    }
+
+    async fn get_chain_info(&self, from_group: u32, to_group: u32) -> Result<ChainInfo> {
+        let endpoint =
+            format!("blockflow/chain-info?fromGroup={}&toGroup={}", from_group, to_group);
+        let url = Url::parse(&format!("{}/{}", self.base_url, endpoint))?;
+        let response = self.inner.get(url).send().await?.json().await?;
+        Ok(response)
     }
 }

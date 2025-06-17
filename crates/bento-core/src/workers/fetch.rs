@@ -110,6 +110,7 @@ pub async fn fetch_chunk<T: BlockProvider + 'static>(
 mod tests {
     use super::*;
     use async_trait::async_trait;
+    use bento_types::ChainInfo;
     use bento_types::*;
     use mockall::predicate::*;
     use mockall::*;
@@ -141,6 +142,8 @@ mod tests {
                 from_group: u32,
                 to_group: u32,
             ) -> Result<Vec<String>>;
+
+            async fn get_chain_info(&self, from_group: u32, to_group: u32) -> Result<ChainInfo>;
         }
     }
 
@@ -375,8 +378,8 @@ mod tests {
     }
 
     // Helper function to create a test block
-    fn create_test_block(hash: &str, timestamp: u64) -> BlockEntry {
-        BlockEntry {
+    fn create_test_block(hash: &str, timestamp: u64) -> RichBlockEntry {
+        RichBlockEntry {
             hash: hash.to_string(),
             timestamp: timestamp as i64,
             chain_from: 1,

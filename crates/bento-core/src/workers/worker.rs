@@ -81,6 +81,14 @@ impl Worker {
 
     pub async fn run_backfill(&self, backfill_opts: BackfillOptions) -> Result<()> {
         println!("Running backfill with options: {:?}", backfill_opts);
+        let stop_ts = if let Some(ts) = backfill_opts.stop_ts {
+            ts
+        // }
+        // else if let Some(local_ts) = get_max_block_timestamp(&self.db_pool).await? {
+        //     local_ts as u64
+        } else {
+            self.get_latest_block_timestamp_from_node(0, 0).await?
+        };
         let start_ts = match backfill_opts.start_ts {
             Some(ts) => ts,
             None => {
@@ -94,15 +102,13 @@ impl Worker {
             }
         };
 
-        let stop_ts = match backfill_opts.stop_ts {
-            Some(ts) => ts,
-            None => {
-                get_max_block_timestamp(&self.db_pool)
-                    .await?
-                    .unwrap_or_else(|| chrono::Utc::now().timestamp_millis()) as u64
-                //TODO: If the database is empty, get the most recent block timestamp from the node
-            }
-        };
+        tracing::info!(
+            "Backfilling from {} to {} with step {} and request interval {}",
+            start_ts,
+            stop_ts,
+            backfill_opts.step,
+            backfill_opts.request_interval
+        );
 
         let mut current_ts = start_ts;
         while current_ts < stop_ts {
@@ -233,6 +239,20 @@ impl Worker {
             }
         }
         groups
+    }
+
+    async fn get_latest_block_timestamp_from_node(
+        &self,
+        chain_from: u32,
+        chain_to: u32,
+    ) -> Result<u64> {
+        let chain_info = self.client.get_chain_info(chain_from, chain_to).await?;
+        let hashes = self
+            .client
+            .get_block_hash_by_height(chain_info.current_height as u64, chain_from, chain_to)
+            .await?;
+        let block = self.client.get_block_and_events_by_hash(&hashes[0]).await?;
+        Ok(block.block.timestamp as u64)
     }
 
     async fn run_pipeline(&self, batches: Vec<BlockBatch>) -> Result<()> {

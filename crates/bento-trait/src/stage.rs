@@ -3,7 +3,7 @@ use async_trait::async_trait;
 
 use bento_types::{
     BlockAndEvents, BlockEntry, BlockHeaderEntry, BlocksAndEventsPerTimestampRange,
-    BlocksPerTimestampRange, StageMessage, Transaction,
+    BlocksPerTimestampRange, ChainInfo, StageMessage, Transaction,
 };
 #[async_trait]
 pub trait BlockProvider {
@@ -31,6 +31,8 @@ pub trait BlockProvider {
         from_group: u32,
         to_group: u32,
     ) -> Result<Vec<String>>;
+
+    async fn get_chain_info(&self, from_group: u32, to_group: u32) -> Result<ChainInfo>;
 }
 
 #[async_trait]

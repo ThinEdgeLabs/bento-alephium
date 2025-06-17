@@ -5,8 +5,8 @@ use async_trait::async_trait;
 use bento_core::{ProcessorFactory, db::DbPool};
 use bento_trait::processor::ProcessorTrait;
 use bento_types::{
-    BlockAndEvents, BlockEntry, CustomProcessorOutput, Transaction, processors::ProcessorOutput,
-    utils::timestamp_millis_to_naive_datetime,
+    BlockAndEvents, CustomProcessorOutput, RichBlockEntry, Transaction,
+    processors::ProcessorOutput, utils::timestamp_millis_to_naive_datetime,
 };
 
 use crate::{
@@ -108,7 +108,7 @@ impl ProcessorTrait for ContractCallProcessor {
 
 pub fn extract_contract_call(
     tx: &Transaction,
-    block: &BlockEntry,
+    block: &RichBlockEntry,
 ) -> Option<NewContractCallTransactionDto> {
     // NOTE: Choosing the first input is possibly not the best approach.
     // Also if the transaction has no inputs we cannot identify the sender.
