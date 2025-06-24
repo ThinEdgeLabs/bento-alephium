@@ -83,9 +83,6 @@ impl Worker {
         println!("Running backfill with options: {:?}", backfill_opts);
         let stop_ts = if let Some(ts) = backfill_opts.stop_ts {
             ts
-        // }
-        // else if let Some(local_ts) = get_max_block_timestamp(&self.db_pool).await? {
-        //     local_ts as u64
         } else {
             self.get_latest_block_timestamp_from_node(0, 0).await?
         };
@@ -129,37 +126,35 @@ impl Worker {
 
     pub async fn run_sync(&self) -> Result<()> {
         let request_interval = self.sync_opts.unwrap().request_interval;
-        let step = self.sync_opts.unwrap().step;
+        // let step = self.sync_opts.unwrap().step;
         let backstep = self.sync_opts.unwrap().backstep;
 
         loop {
-            // Get the most recent block timestamp from the database or node
-            // and start syncing from there
-            let mut current_ts = get_max_block_timestamp(&self.db_pool)
+            tracing::info!("Syncing...");
+            let latest_remote_ts = self.get_latest_block_timestamp_from_node(0, 0).await?;
+            let latest_local_ts = get_max_block_timestamp(&self.db_pool)
                 .await?
                 .map(|ts| ts as u64)
-                //TODO: If the database is empty, get the most recent block timestamp from the node
-                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() as u64)
-                - backstep;
+                .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() as u64);
+            // If we're behind by more than `backstep`, we start from now
+            // otherwise the interval is too large.
+            // This means a backfill is required.
+            let start_ts = if latest_remote_ts - (latest_local_ts - backstep) > backstep {
+                latest_remote_ts - backstep
+            } else {
+                latest_local_ts - backstep
+            };
 
-            let now = chrono::Utc::now().timestamp_millis() as u64;
+            self.sync_range(start_ts, latest_remote_ts).await?;
 
-            // Process in chunks of 'step' size until we reach 'now'
-            while current_ts < now {
-                let chunk_end = std::cmp::min(current_ts + step, now);
-
-                if current_ts >= chunk_end {
-                    break; // No more data to process
-                }
-
-                tracing::info!("Processing sync chunk: {} to {}", current_ts, chunk_end);
-
-                self.sync_range(current_ts, chunk_end).await?;
-
-                current_ts = chunk_end;
-            }
-
-            tokio_sleep(Duration::from_millis(request_interval)).await;
+            let sleep_duration = Duration::from_millis(request_interval);
+            tracing::info!(
+                "Synced blocks from {} to {}, waiting {} seconds before next sync",
+                start_ts,
+                latest_remote_ts,
+                sleep_duration.as_secs_f64()
+            );
+            tokio_sleep(sleep_duration).await;
         }
     }
 
