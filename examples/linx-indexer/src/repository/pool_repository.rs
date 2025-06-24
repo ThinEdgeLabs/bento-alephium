@@ -38,7 +38,6 @@ impl PoolRepository {
         let mut conn = self.db_pool.get().await?;
 
         let pools: Vec<Pool> = schema::pools::table.load(&mut conn).await?;
-        println!("pools: {:?}", pools);
         Ok(pools.into_iter().map(|pool| (pool.address.clone(), pool)).collect())
     }
 }
