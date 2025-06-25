@@ -4,6 +4,7 @@ use bento_types::{db::new_db_pool, DbPool};
 use handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tower_http::cors::CorsLayer;
 use utoipa::{openapi::Info, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
@@ -96,7 +97,9 @@ pub async fn start(config: Config, custom_router: Option<OpenApiRouter<AppState>
 
     api.info = Info::new("REST API", "v1");
     api.info.description = Some("Bento Alephium Indexer REST API".to_string());
-    let app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
+    let app = app
+        .layer(CorsLayer::permissive())
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
     let addr = config.api_endpoint();
     let listener = tokio::net::TcpListener::bind(addr).await?;
