@@ -43,8 +43,6 @@ WORKDIR /app
 COPY --from=builder /app/bento /app/
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/diesel
 
-COPY ./examples/linx-indexer/config.toml /app/config.toml
-
 WORKDIR /app
 
 CMD ["tail", "-f", "/dev/null"]

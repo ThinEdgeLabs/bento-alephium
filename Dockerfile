@@ -44,8 +44,5 @@ WORKDIR /app
 # Copy binaries from workspace target directory
 COPY --from=builder /app/bento /app/
 
-# Copy config
-COPY ./examples/linx-indexer/config.toml /app/config.toml
-
 # Default command will be overridden in docker-compose.yml
 CMD ["./bento"]

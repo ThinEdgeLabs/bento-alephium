@@ -30,7 +30,6 @@ impl BlockProvider for Client {
     /// # Returns
     ///
     /// A `Result` containing a `BlocksAndEventsPerTimestampRange` structure, or an error if the request fails.
-    /// TODO: Fix hardcoded parameters in retry
     async fn get_blocks_and_events(
         &self,
         from_ts: u64,
