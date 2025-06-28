@@ -4,9 +4,11 @@ use bento_types::{db::new_db_pool, DbPool};
 use handler::{BlockApiModule, EventApiModule, TransactionApiModule};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tower_http::cors::CorsLayer;
 use utoipa::{openapi::Info, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
+
 pub mod error;
 pub mod handler;
 
@@ -88,19 +90,16 @@ impl Pagination {
     }
 }
 
-pub async fn start(config: Config) -> Result<()> {
-    // initialize tracing
-    tracing_subscriber::fmt::init();
-
-    // create our application state
+pub async fn start(config: Config, custom_router: Option<OpenApiRouter<AppState>>) -> Result<()> {
     let state = AppState { db: config.clone().db_client };
 
-    // create our application stack
-    let (app, mut api) = configure_api().with_state(state).split_for_parts();
+    let (app, mut api) = configure_api(custom_router).with_state(state).split_for_parts();
 
-    api.info = Info::new("Alephium REST API", "v1");
+    api.info = Info::new("REST API", "v1");
     api.info.description = Some("Bento Alephium Indexer REST API".to_string());
-    let app = app.merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
+    let app = app
+        .layer(CorsLayer::permissive())
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api.clone()));
 
     let addr = config.api_endpoint();
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -110,22 +109,21 @@ pub async fn start(config: Config) -> Result<()> {
     Ok(())
 }
 
-// basic handler that responds with a static string
 async fn root() -> &'static str {
     "Hello Alephium Indexer API"
 }
 
-/// Setup the API routes
 #[allow(clippy::let_and_return)]
-pub fn configure_api() -> OpenApiRouter<AppState> {
+pub fn configure_api(custom_router: Option<OpenApiRouter<AppState>>) -> OpenApiRouter<AppState> {
     let router = OpenApiRouter::new()
-        .nest("/blocks", BlockApiModule::register())
-        .nest("/events", EventApiModule::register())
-        .nest("/transactions", TransactionApiModule::register())
+        .nest("/v1/blocks", BlockApiModule::register())
+        .nest("/v1/events", EventApiModule::register())
+        .nest("/v1/transactions", TransactionApiModule::register())
         .route("/", get(root));
 
-    // Users can extend with their modules:
-    // router.merge(YourApiModule::register())
-
-    router
+    if let Some(custom_router) = custom_router {
+        router.nest("/v1", custom_router)
+    } else {
+        router
+    }
 }
